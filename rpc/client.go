@@ -30,7 +30,7 @@ func (slf *Client) ReConnect() error {
 		return nil
 	}
 
-	slf.Connect(slf.saddr)
+	return slf.Connect(slf.saddr)
 }
 
 func (slf *Client) Connect(addr string) error {
