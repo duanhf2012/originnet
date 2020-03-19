@@ -1,11 +1,19 @@
 package rpc
 
-import "fmt"
+import (
+	"fmt"
+
+	"reflect"
+	"runtime"
+	"strings"
+)
+
+type RPCMethodType func(interface{},interface{}) error
 
 type RpcHandler struct {
-	name string
-	functions map[interface{}]interface{}
+	functions map[interface{}]RPCMethodType
 	callchannel chan *CallInfo
+	rpcHandler IRpcHandler
 }
 
 type IRpcHandler interface {
@@ -14,21 +22,36 @@ type IRpcHandler interface {
 }
 
 func (slf *RpcHandler) InitRpcHandler(rpcHandler IRpcHandler) {
-	slf.name = fmt.Sprintf("%T",rpcHandler)
 	slf.callchannel = make(chan *CallInfo,10000)
+	slf.rpcHandler = rpcHandler
+	slf.functions = make(map[interface{}]RPCMethodType,1)
 }
 
-func (slf *RpcHandler) GetName() string {
-	return slf.name
-}
 
-func  (slf *RpcHandler) RegisterRpc(id interface{}, f interface{}) error {
-	switch f.(type) {
-	case func(interface{},interface{}) error:
-	default:
-		//return fmt.Errorf("function id %v: already registered", id)
-		panic(fmt.Sprintf("function id %v: already registered", id))
+
+func getFunctionName(i interface{}) string {
+	name := runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
+	startx := strings.LastIndex(name,".")
+	if startx == -1{
+		return name
 	}
+	endx := strings.LastIndex(name,"-")
+	if endx == -1 {
+		endx = len(name)
+	}
+	name = string([]byte(name)[startx+1:endx])
+
+	return name
+}
+
+
+func  (slf *RpcHandler) RegisterRpc(f RPCMethodType) error {
+	name := getFunctionName(f)
+
+	if strings.Index(name,"RPC_")!=0 {
+		panic("register error rpc method")
+	}
+	id := slf.rpcHandler.GetName()+"."+name
 
 	slf.functions[id] = f
 	return nil
@@ -50,8 +73,7 @@ func (slf *RpcHandler) Handler(callinfo *CallInfo) {
 		return
 	}
 
-	pFun := v.(func(interface{},interface{}) error)
-	callinfo.err = pFun(callinfo.arg,callinfo.reply)
+	callinfo.err = v(callinfo.arg,callinfo.reply)
 }
 
 func (slf *RpcHandler) GetRpcChannel() (chan *CallInfo) {
