@@ -20,7 +20,7 @@ type Client struct {
 
 func (slf *Client) Call(NodeServiceMethod string, args interface{},replys interface{} ) error {
 	if slf.blocalhost == true {
-
+		//node.GetService("")
 	}
 	return nil
 }

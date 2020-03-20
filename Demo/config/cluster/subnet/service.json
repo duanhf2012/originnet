@@ -1,0 +1,8 @@
+{
+  "HttpService":{
+	"Port":10001
+  },
+  "TcpService":{
+	"port":10002
+  }
+}

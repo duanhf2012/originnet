@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 	"github.com/duanhf2012/originnet/service"
+	"github.com/duanhf2012/originnet/cluster"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -20,7 +21,7 @@ func init(){
 	closeSig = make(chan bool,1)
 }
 
-func Init() {
+func init() {
 	sigs = make(chan os.Signal, 3)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM,syscall.Signal(10))
 }
@@ -57,7 +58,14 @@ func writeProcessPid() {
 	}
 }
 
+var cls cluster.Cluster
+
+func GetNodeId() int {
+	return 1
+}
+
 func Start() {
+	cls.Init(GetNodeId())
 	for _,s := range mapServiceName {
 		s.OnInit()
 	}
@@ -101,4 +109,8 @@ func GetService(servicename string) service.IService {
 	}
 
 	return s
+}
+
+func SetConfigDir(configdir string){
+	cluster.SetConfigDir(configdir)
 }
