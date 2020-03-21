@@ -12,16 +12,12 @@ import (
 	"time"
 )
 
-var mapServiceName map[string]service.IService
 var closeSig chan bool
 var sigs chan os.Signal
-
-func init(){
-	mapServiceName = make(map[string]service.IService,5)
-	closeSig = make(chan bool,1)
-}
+var cls cluster.Cluster
 
 func init() {
+	closeSig = make(chan bool,1)
 	sigs = make(chan os.Signal, 3)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM,syscall.Signal(10))
 }
@@ -58,20 +54,18 @@ func writeProcessPid() {
 	}
 }
 
-var cls cluster.Cluster
-
 func GetNodeId() int {
 	return 1
 }
 
-func Start() {
+func Init(){
 	cls.Init(GetNodeId())
-	for _,s := range mapServiceName {
-		s.OnInit()
-	}
-	for _,s := range mapServiceName {
-		s.Start()
-	}
+	service.Init(closeSig)
+}
+
+func Start() {
+	cls.Start()
+	service.Start()
 	writeProcessPid()
 	for {
 		select {
@@ -82,33 +76,17 @@ func Start() {
 		}
 	}
 
-
 	close(closeSig)
-	for _,s := range mapServiceName {
-		s.Wait()
-	}
+	service.WaitStop()
 }
 
 
 func Setup(s service.IService) bool {
-	_,ok := mapServiceName[s.GetName()]
-	if ok == true {
-		return false
-	}
-
-	s.Init(s,closeSig)
-	mapServiceName[s.GetName()] = s
-
-	return true
+	return service.Setup(s)
 }
 
 func GetService(servicename string) service.IService {
-	s,ok := mapServiceName[servicename]
-	if ok == false {
-		return nil
-	}
-
-	return s
+	return service.GetService(servicename)
 }
 
 func SetConfigDir(configdir string){

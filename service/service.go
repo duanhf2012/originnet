@@ -13,13 +13,14 @@ var closeSig chan bool
 var timerDispatcherLen = 10
 
 type IService interface {
-	Init(iservice IService,closeSig chan bool)
+	Init(iservice IService)
 	GetName() string
 
 	OnInit() error
 	OnRelease()
 	Wait()
 	Start()
+	GetRpcHandler() rpc.IRpcHandler
 }
 
 
@@ -53,9 +54,8 @@ func (slf *Service) reflectRpcMethodInfo(iservice IService) {
 	}*/
 }
 
-func (slf *Service) Init(iservice IService,closeSig chan bool) {
+func (slf *Service) Init(iservice IService) {
 	slf.name = reflect.Indirect(reflect.ValueOf(iservice)).Type().Name()
-	slf.closeSig = closeSig
 	slf.dispatcher =timer.NewDispatcher(timerDispatcherLen)
 	slf.this = iservice
 	slf.InitRpcHandler(iservice.(rpc.IRpcHandler))
@@ -81,7 +81,7 @@ func (slf *Service) Run() {
 	for{
 		rpcChannel := slf.GetRpcChannel()
 		select {
-		case <- slf.closeSig:
+		case <- closeSig:
 			bStop = true
 		case callinfo :=<- rpcChannel:
 			slf.Handler(callinfo)
@@ -109,9 +109,6 @@ func (slf *Service) OnInit() error {
 	return nil
 }
 
-func Init(chanCloseSig chan bool) {
-	closeSig=chanCloseSig
-}
 
 func (slf *Service) AfterFunc(d time.Duration, cb func()) *timer.Timer {
 	return slf.dispatcher.AfterFunc(d, cb)

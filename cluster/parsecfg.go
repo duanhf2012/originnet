@@ -51,7 +51,7 @@ func (slf *Cluster) InitCfg(currentNodeId int) error{
 	localSubNetMapNode := map[int]NodeInfo{}           //本子网内 map[NodeId]NodeInfo
 	localSubNetMapService := map[string][]NodeInfo{}   //本子网内所有ServiceName对应的结点列表
 	localNodeMapService := map[string]interface{}{}    //本Node支持的服务
-
+	localNodeInfo := NodeInfo{}
 
 
 	err := slf.ReadAllSubNetConfig()
@@ -96,6 +96,7 @@ func (slf *Cluster) InitCfg(currentNodeId int) error{
 				}
 				localNodeMapService[servicename] = nil
 			}
+			localNodeInfo = nodeinfo
 		}
 
 		for _,s := range nodeinfo.ServiceList {
@@ -110,6 +111,9 @@ func (slf *Cluster) InitCfg(currentNodeId int) error{
 			localSubNetMapService[s] = append(localSubNetMapService[s],nodeinfo)
 		}
 	}
+	if localNodeInfo.NodeId == 0 {
+		return fmt.Errorf("Canoot find NodeId %d not in any config file.",currentNodeId)
+	}
 
 	slf.mapSubNetInfo = mapSubNetInfo
 	slf.mapSubNetNodeInfo=mapSubNetNodeInfo
@@ -117,7 +121,7 @@ func (slf *Cluster) InitCfg(currentNodeId int) error{
 	slf.localSubNetMapService = localSubNetMapService
 	slf.localNodeMapService = localNodeMapService
 	slf.localsubnet = subnet
-
+	slf.localNodeInfo =localNodeInfo
 	return err
 }
 

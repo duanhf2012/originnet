@@ -6,12 +6,6 @@ import (
 	"strings"
 )
 
-type IRpcConn interface {
-	ReConnect() error
-	Connect(addr string) error
-	Call(NodeServiceMethod string, args interface{},replys interface{} ) error
-}
-
 type Client struct {
 	blocalhost bool
 	conn net.Conn

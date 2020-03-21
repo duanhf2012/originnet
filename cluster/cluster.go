@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"github.com/duanhf2012/originnet/rpc"
+	"github.com/duanhf2012/originnet/service"
 )
 
 var configdir = "./config/"
@@ -30,17 +31,12 @@ type Cluster struct {
 	localSubNetMapNode map[int]NodeInfo           //本子网内 map[NodeId]NodeInfo
 	localSubNetMapService map[string][]NodeInfo   //本子网内所有ServiceName对应的结点列表
 	localNodeMapService map[string]interface{}    //本Node支持的服务
+	localNodeInfo NodeInfo
 
 	mapRpc map[int] NodeRpcInfo//nodeid
+
 	rpcServer rpc.Server
 }
-
-
-type RemoteNode struct {
-	rpcconn rpc.IRpcConn
-}
-
-
 
 
 func SetConfigDir(cfgdir string){
@@ -68,6 +64,8 @@ func (slf *Cluster) Init(currentNodeId int) error{
 		return err
 	}
 
+	slf.rpcServer.Init(slf)
+
 	//2.建议rpc连接
 	slf.mapRpc = map[int] NodeRpcInfo{}
 	for _,nodeinfo := range slf.localSubNetMapNode {
@@ -82,6 +80,19 @@ func (slf *Cluster) Init(currentNodeId int) error{
 		slf.mapRpc[nodeinfo.NodeId] = rpcinfo
 	}
 
+
 	return nil
 }
 
+func (slf *Cluster) FindRpcHandler(servicename string) rpc.IRpcHandler {
+	pService := service.GetService(servicename)
+	if pService == nil {
+		return nil
+	}
+
+	return pService.GetRpcHandler()
+}
+
+func (slf *Cluster) Start() {
+	slf.rpcServer.Start(slf.localNodeInfo.ListenAddr)
+}

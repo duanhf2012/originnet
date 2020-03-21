@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-type RPCMethodType func(interface{},interface{}) error
+type RPCMethodType func(arg ...interface{}) (interface{},error)
 
 type RpcHandler struct {
 	functions map[interface{}]RPCMethodType
@@ -45,7 +45,7 @@ func getFunctionName(i interface{}) string {
 }
 
 
-func  (slf *RpcHandler) RegisterRpc(f RPCMethodType) error {
+func  (slf *RpcHandler) RegisterRpc(f RPCMethodType,inParam interface{},outParam interface{}) error {
 	name := getFunctionName(f)
 
 	if strings.Index(name,"RPC_")!=0 {
@@ -73,7 +73,7 @@ func (slf *RpcHandler) Handler(callinfo *CallInfo) {
 		return
 	}
 
-	callinfo.err = v(callinfo.arg,callinfo.reply)
+	callinfo.reply,callinfo.err = v(callinfo.arg)
 }
 
 func (slf *RpcHandler) GetRpcChannel() (chan *CallInfo) {
