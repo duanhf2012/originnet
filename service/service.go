@@ -25,33 +25,12 @@ type IService interface {
 
 
 type Service struct {
-	//
-	rpc.RpcHandler
-	name string
+	rpc.RpcHandler   //rpc
+	dispatcher         *timer.Dispatcher //timer
+	name string    //service name
 	closeSig chan bool
-	dispatcher         *timer.Dispatcher
 	wg      sync.WaitGroup
 	this    IService
-}
-
-func (slf *Service)GetRpcHandler() rpc.IRpcHandler{
-	return slf.this.(rpc.IRpcHandler)
-}
-
-func (slf *Service) reflectRpcMethodInfo(iservice IService) {
-	/*
-	values := reflect.ValueOf(iservice)
-	types := reflect.TypeOf(iservice)
-
-	slf.name = reflect.Indirect(values).Type().Name()
-	for m := 0; m < types.NumMethod(); m++ {
-		method := types.Method(m)
-		mtype := method.Type
-		mname := method.Name
-		if strings.Index(mname,"RPC_")!=0 {
-			continue
-		}
-	}*/
 }
 
 func (slf *Service) Init(iservice IService) {
@@ -59,10 +38,6 @@ func (slf *Service) Init(iservice IService) {
 	slf.dispatcher =timer.NewDispatcher(timerDispatcherLen)
 	slf.this = iservice
 	slf.InitRpcHandler(iservice.(rpc.IRpcHandler))
-
-	//
-	//slf.reflectRpcMethodInfo(iservice)
-
 
 	slf.OnInit()
 }

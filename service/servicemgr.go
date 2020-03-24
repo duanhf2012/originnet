@@ -3,8 +3,13 @@ package service
 //本地所有的service
 var mapServiceName map[string]IService
 
+func init(){
+	mapServiceName = map[string]IService{}
+}
+
 func Init(chanCloseSig chan bool) {
 	closeSig=chanCloseSig
+
 	for _,s := range mapServiceName {
 		s.OnInit()
 	}
@@ -12,12 +17,13 @@ func Init(chanCloseSig chan bool) {
 
 
 func Setup(s IService) bool {
+
 	_,ok := mapServiceName[s.GetName()]
 	if ok == true {
 		return false
 	}
 
-	s.Init(s)
+	//s.Init(s)
 	mapServiceName[s.GetName()] = s
 
 	return true

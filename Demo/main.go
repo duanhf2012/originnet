@@ -15,21 +15,21 @@ func init(){
 	node.Setup(&TestService{})
 }
 
-func (slf *TestService) RPC_Test(a interface{},b interface{}) error{
+func (slf *TestService) RPC_Test(a *int,b *int) (*string,error) {
 	fmt.Printf("xxxx\n")
 	//slf.AfterFunc(time.Second,slf.Test)
-	return nil
+	return nil,nil
 }
 
 func (slf *TestService) OnInit() error {
-	//slf.AfterFunc(time.Second,slf.Test)
-	slf.RegisterRpc(slf.RPC_Test)
+
 	return nil
 }
 
 
 
 func main(){
+	node.Init()
 	node.Start()
 }
 

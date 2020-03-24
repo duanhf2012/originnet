@@ -26,14 +26,15 @@ func (slf *Cluster) ReadServiceConfig(filepath string) error {
 }
 
 func (slf *Cluster) ReadAllSubNetConfig() error {
-	fileInfoList,err := ioutil.ReadDir(configdir)
+	clusterCfgPath :=strings.TrimRight(configdir,"/")  +"/cluster"
+	fileInfoList,err := ioutil.ReadDir(clusterCfgPath)
 	if err != nil {
 		return err
 	}
-
+	slf.mapSubNetInfo =map[string] SubNet{}
 	for _,f := range fileInfoList{
 		if f.IsDir() == true {
-			subnetinfo,err:=slf.ReadClusterConfig(strings.TrimRight(strings.TrimRight(configdir,"/"),"\\")+"/"+f.Name()+"/"+"cluster.json")
+			subnetinfo,err:=slf.ReadClusterConfig(strings.TrimRight(strings.TrimRight(clusterCfgPath,"/"),"\\")+"/"+f.Name()+"/"+"cluster.json")
 			if err != nil {
 				return err
 			}
@@ -46,7 +47,7 @@ func (slf *Cluster) ReadAllSubNetConfig() error {
 
 
 func (slf *Cluster) InitCfg(currentNodeId int) error{
-	mapSubNetInfo  := map[string] SubNet{} //子网名称，子网信息
+	//mapSubNetInfo  := map[string] SubNet{} //子网名称，子网信息
 	mapSubNetNodeInfo := map[string]map[int]NodeInfo{} //map[子网名称]map[NodeId]NodeInfo
 	localSubNetMapNode := map[int]NodeInfo{}           //本子网内 map[NodeId]NodeInfo
 	localSubNetMapService := map[string][]NodeInfo{}   //本子网内所有ServiceName对应的结点列表
@@ -58,7 +59,7 @@ func (slf *Cluster) InitCfg(currentNodeId int) error{
 
 	//分析配置
 	var localSubnetName string
-	for subnetName,subnetInfo := range mapSubNetInfo {
+	for subnetName,subnetInfo := range slf.mapSubNetInfo {
 		for _,nodeinfo := range subnetInfo.NodeList {
 			//装载slf.mapNodeInfo
 			_,ok := mapSubNetNodeInfo[subnetName]
@@ -79,7 +80,7 @@ func (slf *Cluster) InitCfg(currentNodeId int) error{
 
 
 	//装载
-	subnet,ok := mapSubNetInfo[localSubnetName]
+	subnet,ok := slf.mapSubNetInfo[localSubnetName]
 	if ok == false {
 		return fmt.Errorf("NodeId %d not in any subnet",currentNodeId)
 	}
@@ -115,7 +116,7 @@ func (slf *Cluster) InitCfg(currentNodeId int) error{
 		return fmt.Errorf("Canoot find NodeId %d not in any config file.",currentNodeId)
 	}
 
-	slf.mapSubNetInfo = mapSubNetInfo
+
 	slf.mapSubNetNodeInfo=mapSubNetNodeInfo
 	slf.localSubNetMapNode=localSubNetMapNode
 	slf.localSubNetMapService = localSubNetMapService
@@ -125,3 +126,8 @@ func (slf *Cluster) InitCfg(currentNodeId int) error{
 	return err
 }
 
+
+func (slf *Cluster) IsConfigService(servicename string) bool {
+	_,ok := slf.localNodeMapService[servicename]
+	return ok
+}

@@ -16,6 +16,8 @@ var closeSig chan bool
 var sigs chan os.Signal
 var cls cluster.Cluster
 
+var preSetupService []service.IService //预安装
+
 func init() {
 	closeSig = make(chan bool,1)
 	sigs = make(chan os.Signal, 3)
@@ -59,8 +61,24 @@ func GetNodeId() int {
 }
 
 func Init(){
-	cls.Init(GetNodeId())
+	//1.初始化集群
+	err := cls.Init(GetNodeId())
+	if err != nil {
+		panic(err)
+	}
+
+	//2.service模块初始化
 	service.Init(closeSig)
+
+	//3.初始化预安装的服务
+	for _,s := range preSetupService {
+		s.Init(s)
+		//是否配置的service
+		if cls.IsConfigService(s.GetName()) == false {
+			continue
+		}
+		service.Setup(s)
+	}
 }
 
 func Start() {
@@ -81,8 +99,8 @@ func Start() {
 }
 
 
-func Setup(s service.IService) bool {
-	return service.Setup(s)
+func Setup(s service.IService)  {
+	preSetupService = append(preSetupService,s)
 }
 
 func GetService(servicename string) service.IService {

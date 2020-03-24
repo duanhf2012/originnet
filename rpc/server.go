@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"github.com/duanhf2012/originnet/log"
 	"github.com/duanhf2012/originnet/network"
 	"math"
 	"net"
@@ -9,7 +8,7 @@ import (
 
 type CallInfo struct {
 	serviceMethod string
-	arg interface{}
+	arg []interface{}
 	reply interface{}
 	err error
 	done          chan *CallInfo  // Strobes when call is complete.
@@ -61,7 +60,7 @@ type RpcAgent struct {
 	userData interface{}
 }
 
-func (agent *RpcAgent) Run() {
+func (agent *RpcAgent) Run() {/*
 	for {
 		data, err := agent.conn.ReadMsg()
 		if err != nil {
@@ -81,19 +80,24 @@ func (agent *RpcAgent) Run() {
 				break
 			}
 		}
-	}
+	}*/
+
 }
 
 func (agent *RpcAgent) OnClose() {
+	/*
 	if agent.gate.AgentChanRPC != nil {
 		err := agent.gate.AgentChanRPC.Call0("CloseAgent", agent)
 		if err != nil {
 			log.Error("chanrpc error: %v", err)
 		}
 	}
+
+	 */
 }
 
 func (agent *RpcAgent) WriteMsg(msg interface{}) {
+	/*
 	if agent.gate.Processor != nil {
 		data, err := agent.gate.Processor.Marshal(msg)
 		if err != nil {
@@ -104,7 +108,7 @@ func (agent *RpcAgent) WriteMsg(msg interface{}) {
 		if err != nil {
 			log.Error("write message %v error: %v", reflect.TypeOf(msg), err)
 		}
-	}
+	}*/
 }
 
 func (agent *RpcAgent) LocalAddr() net.Addr {

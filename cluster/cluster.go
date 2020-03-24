@@ -96,3 +96,5 @@ func (slf *Cluster) FindRpcHandler(servicename string) rpc.IRpcHandler {
 func (slf *Cluster) Start() {
 	slf.rpcServer.Start(slf.localNodeInfo.ListenAddr)
 }
+
+
