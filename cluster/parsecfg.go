@@ -131,3 +131,15 @@ func (slf *Cluster) IsConfigService(servicename string) bool {
 	_,ok := slf.localNodeMapService[servicename]
 	return ok
 }
+
+func (slf *Cluster) GetNodeIdByService(servicename string) []int{
+	var nodelist []int
+	nodeInfoList,ok := slf.localSubNetMapService[servicename]
+	if ok == true {
+		for _,node := range nodeInfoList {
+			nodelist = append(nodelist,node.NodeId)
+		}
+	}
+
+	return nodelist
+}

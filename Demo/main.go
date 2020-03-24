@@ -15,10 +15,10 @@ func init(){
 	node.Setup(&TestService{})
 }
 
-func (slf *TestService) RPC_Test(a *int,b *int) (*string,error) {
+func (slf *TestService) RPC_Test(a *int,b *int) error {
 	fmt.Printf("xxxx\n")
 	//slf.AfterFunc(time.Second,slf.Test)
-	return nil,nil
+	return nil
 }
 
 func (slf *TestService) OnInit() error {

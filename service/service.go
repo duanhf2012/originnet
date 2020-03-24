@@ -13,7 +13,7 @@ var closeSig chan bool
 var timerDispatcherLen = 10
 
 type IService interface {
-	Init(iservice IService)
+	Init(iservice IService,fun rpc.FuncRpcClient)
 	GetName() string
 
 	OnInit() error
@@ -33,11 +33,11 @@ type Service struct {
 	this    IService
 }
 
-func (slf *Service) Init(iservice IService) {
+func (slf *Service) Init(iservice IService,fun rpc.FuncRpcClient) {
 	slf.name = reflect.Indirect(reflect.ValueOf(iservice)).Type().Name()
 	slf.dispatcher =timer.NewDispatcher(timerDispatcherLen)
 	slf.this = iservice
-	slf.InitRpcHandler(iservice.(rpc.IRpcHandler))
+	slf.InitRpcHandler(iservice.(rpc.IRpcHandler),fun)
 
 	slf.OnInit()
 }
@@ -54,12 +54,12 @@ func (slf *Service) Run() {
 	defer slf.wg.Done()
 	var bStop = false
 	for{
-		rpcChannel := slf.GetRpcChannel()
+		rpcRequestChan := slf.GetRpcRequestChan()
 		select {
 		case <- closeSig:
 			bStop = true
-		case callinfo :=<- rpcChannel:
-			slf.Handler(callinfo)
+		case rpcRequest :=<- rpcRequestChan:
+			slf.GetRpcHandler().HandlerRpcRequest(rpcRequest)
 		case t := <- slf.dispatcher.ChanTimer:
 			t.Cb()
 		}

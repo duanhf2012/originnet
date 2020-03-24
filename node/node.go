@@ -14,7 +14,6 @@ import (
 
 var closeSig chan bool
 var sigs chan os.Signal
-var cls cluster.Cluster
 
 var preSetupService []service.IService //预安装
 
@@ -62,7 +61,7 @@ func GetNodeId() int {
 
 func Init(){
 	//1.初始化集群
-	err := cls.Init(GetNodeId())
+	err := cluster.GetCluster().Init(GetNodeId())
 	if err != nil {
 		panic(err)
 	}
@@ -72,9 +71,9 @@ func Init(){
 
 	//3.初始化预安装的服务
 	for _,s := range preSetupService {
-		s.Init(s)
+		s.Init(s,cluster.GetRpcClient)
 		//是否配置的service
-		if cls.IsConfigService(s.GetName()) == false {
+		if cluster.GetCluster().IsConfigService(s.GetName()) == false {
 			continue
 		}
 		service.Setup(s)
@@ -82,7 +81,7 @@ func Init(){
 }
 
 func Start() {
-	cls.Start()
+	cluster.GetCluster().Start()
 	service.Start()
 	writeProcessPid()
 	for {

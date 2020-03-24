@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"fmt"
+	"github.com/duanhf2012/originnet/log"
 	"reflect"
 	"strings"
 	"unicode"
@@ -14,31 +15,41 @@ type RpcMethodInfo struct {
 	method reflect.Method
 	param []reflect.Type
 	returns reflect.Type
+
+	oParam interface{}
 	iparam []interface{}
 	ireturns interface{}
 }
 
 type RpcHandler struct {
-	callchannel chan *CallInfo
+	callRequest chan *RpcRequest
+	//callchannel chan *Call //待处理队列
 	rpcHandler IRpcHandler
 	mapfunctons map[string]RpcMethodInfo
+	funcRpcClient FuncRpcClient
 }
 
 type IRpcHandler interface {
 	GetName() string
-	InitRpcHandler(rpcHandler IRpcHandler)
+	InitRpcHandler(rpcHandler IRpcHandler,fun FuncRpcClient)
 	GetRpcHandler() IRpcHandler
+	PushRequest(callinfo *RpcRequest)
+	HandlerRpcRequest(request *RpcRequest)
 }
 
 func (slf *RpcHandler) GetRpcHandler() IRpcHandler{
 	return slf.rpcHandler
 }
 
-func (slf *RpcHandler) InitRpcHandler(rpcHandler IRpcHandler) {
-	slf.callchannel = make(chan *CallInfo,10000)
+type FuncRpcClient func(serviceMethod string) (*Client,error)
+
+func (slf *RpcHandler) InitRpcHandler(rpcHandler IRpcHandler,fun FuncRpcClient) {
+	slf.callRequest = make(chan *RpcRequest,10000)
+
 	slf.rpcHandler = rpcHandler
 	slf.mapfunctons = map[string]RpcMethodInfo{}
 	slf.RegisterRpc(rpcHandler)
+
 }
 
 // Is this an exported - upper case - name?
@@ -67,20 +78,28 @@ func (slf *RpcHandler) suitableMethods(method reflect.Method) error {
 	//取出输入参数类型
 	var rpcMethodInfo RpcMethodInfo
 	typ := method.Type
-	if typ.NumOut() != 2 {
-		return fmt.Errorf("%s The number of returned arguments must be 2!",method.Name)
+	if typ.NumOut() != 1 {
+		return fmt.Errorf("%s The number of returned arguments must be 1!",method.Name)
 	}
 
-	if typ.Out(1).String() != "error" {
+	if typ.Out(0).String() != "error" {
 		return fmt.Errorf("%s The return parameter must be of type error!",method.Name)
 	}
 
-	for in := 1;in<typ.NumIn();in++{
-		if slf.isExportedOrBuiltinType(typ.In(in)) == false {
+	for i := 1;i<typ.NumIn();i++{
+		if slf.isExportedOrBuiltinType(typ.In(i)) == false {
 			return fmt.Errorf("%s Unsupported parameter types!",method.Name)
 		}
-		rpcMethodInfo.param = append(rpcMethodInfo.param,typ.In(in))
-		rpcMethodInfo.iparam = append(rpcMethodInfo.iparam,reflect.New(typ.In(in)))
+
+		//第一个参数为返回参数
+		if i == 1 {
+			rpcMethodInfo.oParam = reflect.New(typ.In(i))
+		}else{
+			rpcMethodInfo.param = append(rpcMethodInfo.param,typ.In(i))
+			rpcMethodInfo.iparam = append(rpcMethodInfo.iparam,reflect.New(typ.In(i)))
+		}
+
+
 	}
 
 	rpcMethodInfo.returns = typ.Out(0)
@@ -89,7 +108,7 @@ func (slf *RpcHandler) suitableMethods(method reflect.Method) error {
 	}
 	rpcMethodInfo.ireturns = reflect.New(typ.Out(0))
 
-	slf.mapfunctons[method.Name] = rpcMethodInfo
+	slf.mapfunctons[slf.rpcHandler.GetName()+"."+method.Name] = rpcMethodInfo
 	return nil
 }
 
@@ -106,19 +125,54 @@ func  (slf *RpcHandler) RegisterRpc(rpcHandler IRpcHandler) error {
 	return nil
 }
 
-func (slf *RpcHandler) Send(callinfo *CallInfo) {
-	if callinfo.connid == 0 {
-		callinfo.done = make(chan *CallInfo,1)
+func (slf *RpcHandler) PushRequest(req *RpcRequest) {
+	slf.callRequest <- req
+}
+
+
+
+func (slf *RpcHandler) GetRpcRequestChan() (chan *RpcRequest) {
+	return slf.callRequest
+}
+
+func (slf *RpcHandler) Call(serviceMethod string,reply interface{},args ...interface{}) error {
+	pClient,err := slf.funcRpcClient(serviceMethod)
+	if err != nil {
+		log.Error("Call serviceMethod is error:%+v!",err)
+		return err
 	}
 
-	slf.callchannel <- callinfo
+	//2.rpcclient调用
+	pCall := pClient.Go(serviceMethod,reply,args)
+	pResult := pCall.Done()
+	return pResult.Err
 }
 
-func (slf *RpcHandler) Handler(callinfo *CallInfo) {
 
+func (slf *RpcHandler) HandlerRpcRequest(request *RpcRequest) {
+	v,ok := slf.mapfunctons[request.ServiceMethod]
+	if ok == false {
+		err := fmt.Errorf("RpcHandler %s cannot find %s",slf.rpcHandler.GetName(),request.ServiceMethod)
+		log.Error("%s",err.Error())
+		request.RequestHandle(nil,err)
+		return
+	}
+
+	var paramList []reflect.Value
+
+	paramList = append(paramList,reflect.ValueOf(slf.GetRpcHandler())) //接受者
+	paramList = append(paramList,reflect.ValueOf(v.oParam)) //输出参数
+	//其他输入参数
+	for _,v := range request.InputParam {
+		paramList = append(paramList,reflect.ValueOf(v))
+	}
+
+	returnValues := v.method.Func.Call(paramList)
+	errInter := returnValues[0].Interface()
+	var err error
+	if errInter != nil {
+		err = errInter.(error)
+	}
+
+	request.RequestHandle(v.oParam,err)
 }
-
-func (slf *RpcHandler) GetRpcChannel() (chan *CallInfo) {
-	return slf.callchannel
-}
-

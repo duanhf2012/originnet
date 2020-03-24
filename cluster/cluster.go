@@ -1,8 +1,11 @@
 package cluster
 
 import (
+	"fmt"
+	"github.com/duanhf2012/originnet/log"
 	"github.com/duanhf2012/originnet/rpc"
 	"github.com/duanhf2012/originnet/service"
+	"strings"
 )
 
 var configdir = "./config/"
@@ -23,6 +26,8 @@ type NodeRpcInfo struct {
 	client *rpc.Client
 }
 
+var cluster Cluster
+
 type Cluster struct {
 	localsubnet SubNet         //本子网
 	mapSubNetInfo map[string] SubNet //子网名称，子网信息
@@ -41,20 +46,6 @@ type Cluster struct {
 
 func SetConfigDir(cfgdir string){
 	configdir = cfgdir
-}
-
-
-func CallNode(NodeId int,NodeServiceMethod string, args interface{},reply interface{} ) error {
-	/*v,ok := mapRpcConn[NodeId]
-	if ok  == false {
-		return fmt.Errorf("cannot find nodeid:%d",NodeId)
-	}
-
-	return v.rpcconn.Call(NodeServiceMethod,args,reply)
-
-	 */
-
-	return nil
 }
 
 func (slf *Cluster) Init(currentNodeId int) error{
@@ -80,7 +71,6 @@ func (slf *Cluster) Init(currentNodeId int) error{
 		slf.mapRpc[nodeinfo.NodeId] = rpcinfo
 	}
 
-
 	return nil
 }
 
@@ -97,4 +87,52 @@ func (slf *Cluster) Start() {
 	slf.rpcServer.Start(slf.localNodeInfo.ListenAddr)
 }
 
+func GetCluster() *Cluster{
+	return &cluster
+}
 
+func (slf *Cluster) GetRpcClient(nodeid int) *rpc.Client {
+	c,ok := slf.mapRpc[nodeid]
+	if ok == false {
+		return nil
+	}
+
+	return c.client
+}
+
+
+//servicename.method
+func Call(irecv rpc.IRpcHandler,serviceMethod string,reply interface{},args ...interface{}) error {
+	pClient,err := GetRpcClient(serviceMethod)
+	if err != nil {
+		log.Error("Call serviceMethod is error:%+v!",err)
+		return err
+	}
+
+	//2.rpcclient调用
+	pCall := pClient.Go(serviceMethod,reply,args)
+	pResult := pCall.Done()
+	return pResult.Err
+}
+
+
+func GetRpcClient(serviceMethod string) (*rpc.Client,error) {
+	serviceAndMethod := strings.Split(serviceMethod,".")
+	if len(serviceAndMethod)!=2 {
+		return nil,fmt.Errorf("servicemethod param  %s is error!",serviceMethod)
+	}
+
+	//1.找到对应的rpcnodeid
+	nodeidList := GetCluster().GetNodeIdByService(serviceAndMethod[0])
+	if len(nodeidList) ==0 {
+		return nil,fmt.Errorf("Cannot Find %s nodeid",serviceMethod)
+	}else if len(nodeidList) >1 {
+		return nil,fmt.Errorf("Find %s more than 1 nodeid",serviceMethod)
+	}
+	pClient := GetCluster().GetRpcClient(nodeidList[0])
+	if pClient==nil {
+		return nil,fmt.Errorf("Cannot connect node id %d",nodeidList[0])
+	}
+
+	return pClient,nil
+}

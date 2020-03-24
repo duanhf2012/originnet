@@ -1,22 +1,33 @@
 package rpc
 
 import (
+	"github.com/duanhf2012/originnet/log"
 	"github.com/duanhf2012/originnet/network"
 	"math"
 	"net"
 )
 
-type CallInfo struct {
-	serviceMethod string
-	arg []interface{}
-	reply interface{}
-	err error
-	done          chan *CallInfo  // Strobes when call is complete.
+var processor iprocessor = &JsonProcessor{}
+var LittleEndian bool
+
+type Call struct {
+	Seq uint64
+	//ServiceMethod string
+	Arg []interface{}
+	Reply interface{}
+	Respone *RpcResponse
+	Err error
+	done          chan *Call  // Strobes when call is complete.
 	connid int
 }
 
+func (slf *Call) Done() *Call{
+	return <-slf.done
+}
+
 type iprocessor interface {
-	Marshal(v interface{}) ([]byte, error)
+	GetSeq(data []byte) uint64
+	Marshal(seq uint64,v interface{}) ([]byte, error)
 	Unmarshal(data []byte, v interface{}) error
 }
 
@@ -24,8 +35,8 @@ type Server struct {
 	functions map[interface{}]interface{}
 	listenAddr string //ip:port
 
-	cmdchannel chan *CallInfo
-	processor iprocessor
+	cmdchannel chan *Call
+
 	rpcHandleFinder RpcHandleFinder
 	rpcserver *network.TCPServer
 }
@@ -35,7 +46,7 @@ type RpcHandleFinder interface {
 }
 
 func (slf *Server) Init(rpcHandleFinder RpcHandleFinder) {
-	slf.cmdchannel = make(chan *CallInfo,10000)
+	slf.cmdchannel = make(chan *Call,10000)
 	slf.rpcHandleFinder = rpcHandleFinder
 	slf.rpcserver = &network.TCPServer{}
 }
@@ -49,6 +60,7 @@ func (slf *Server) Start(listenAddr string) {
 	slf.rpcserver.MaxConnNum = 10000
 	slf.rpcserver.PendingWriteNum = 10000
 	slf.rpcserver.NewAgent =slf.NewAgent
+	slf.rpcserver.LittleEndian = LittleEndian
 }
 
 
@@ -60,7 +72,52 @@ type RpcAgent struct {
 	userData interface{}
 }
 
-func (agent *RpcAgent) Run() {/*
+func (agent *RpcAgent) Run() {
+	for {
+		data,err := agent.conn.ReadMsg()
+		if err != nil {
+			log.Debug("read message: %v", err)
+			break
+		}
+
+		if processor==nil{
+			log.Error("Rpc Processor not set!")
+			continue
+		}
+
+		var req RpcRequest
+		seq := processor.GetSeq(data)
+		err = processor.Unmarshal(data,&req)
+		if err != nil {
+			log.Debug("processor message: %v", err)
+			agent.Close()
+			break
+		}
+
+		//交给程序处理
+		rpcHandler := agent.rpcserver.rpcHandleFinder.FindRpcHandler(req.ServiceMethod)
+		if rpcHandler== nil {
+			log.Error("service method %s not config!", req.ServiceMethod)
+			continue
+		}
+		req.RequestHandle = func(Returns interface{},Err error){
+		var rpcRespone RpcResponse
+			rpcRespone.ServiceMethod = req.ServiceMethod
+			rpcRespone.Returns = Returns
+			rpcRespone.Err = Err
+			bytes,err :=  processor.Marshal(seq,Returns)
+			if err != nil {
+				log.Error("service method %s Marshal error:%+v!", req.ServiceMethod,err)
+				return
+			}
+
+			agent.conn.WriteMsg(bytes)
+		}
+
+	rpcHandler.PushRequest(&req)
+
+	}
+	/*
 	for {
 		data, err := agent.conn.ReadMsg()
 		if err != nil {
@@ -119,7 +176,7 @@ func (agent *RpcAgent) RemoteAddr() net.Addr {
 	return agent.conn.RemoteAddr()
 }
 
-func (agent *RpcAgent) Close() {
+func (agent *RpcAgent)  Close() {
 	agent.conn.Close()
 }
 
