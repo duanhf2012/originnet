@@ -39,7 +39,7 @@ func (slf *Service) Init(iservice IService,fun rpc.FuncRpcClient) {
 	slf.this = iservice
 	slf.InitRpcHandler(iservice.(rpc.IRpcHandler),fun)
 
-	slf.OnInit()
+	slf.this.OnInit()
 }
 
 

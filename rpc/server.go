@@ -5,6 +5,7 @@ import (
 	"github.com/duanhf2012/originnet/network"
 	"math"
 	"net"
+	"strings"
 )
 
 var processor iprocessor = &JsonProcessor{}
@@ -26,8 +27,7 @@ func (slf *Call) Done() *Call{
 }
 
 type iprocessor interface {
-	GetSeq(data []byte) uint64
-	Marshal(seq uint64,v interface{}) ([]byte, error)
+	Marshal(v interface{}) ([]byte, error)
 	Unmarshal(data []byte, v interface{}) error
 }
 
@@ -61,6 +61,7 @@ func (slf *Server) Start(listenAddr string) {
 	slf.rpcserver.PendingWriteNum = 10000
 	slf.rpcserver.NewAgent =slf.NewAgent
 	slf.rpcserver.LittleEndian = LittleEndian
+	slf.rpcserver.Start()
 }
 
 
@@ -70,6 +71,15 @@ type RpcAgent struct {
 	conn     network.Conn
 	rpcserver     *Server
 	userData interface{}
+}
+
+type RpcRequestRw struct {
+	//
+	ServiceMethod string   // format: "Service.Method"
+	//Seq           uint64   // sequence number chosen by client
+	InputParam []byte
+
+	requestHandle RequestHandler
 }
 
 func (agent *RpcAgent) Run() {
@@ -86,7 +96,7 @@ func (agent *RpcAgent) Run() {
 		}
 
 		var req RpcRequest
-		seq := processor.GetSeq(data)
+		//解析head
 		err = processor.Unmarshal(data,&req)
 		if err != nil {
 			log.Debug("processor message: %v", err)
@@ -95,17 +105,23 @@ func (agent *RpcAgent) Run() {
 		}
 
 		//交给程序处理
-		rpcHandler := agent.rpcserver.rpcHandleFinder.FindRpcHandler(req.ServiceMethod)
+		serviceMethod := strings.Split(req.ServiceMethod,".")
+		if len(serviceMethod)!=2 {
+			log.Debug("rpc request req.ServiceMethod is error")
+			continue
+		}
+		rpcHandler := agent.rpcserver.rpcHandleFinder.FindRpcHandler(serviceMethod[0])
 		if rpcHandler== nil {
 			log.Error("service method %s not config!", req.ServiceMethod)
 			continue
 		}
-		req.RequestHandle = func(Returns interface{},Err error){
+		req.requestHandle = func(Returns interface{},Err error){
 		var rpcRespone RpcResponse
+			rpcRespone.Seq = req.Seq
 			rpcRespone.ServiceMethod = req.ServiceMethod
 			rpcRespone.Returns = Returns
 			rpcRespone.Err = Err
-			bytes,err :=  processor.Marshal(seq,Returns)
+			bytes,err :=  processor.Marshal(rpcRespone)
 			if err != nil {
 				log.Error("service method %s Marshal error:%+v!", req.ServiceMethod,err)
 				return

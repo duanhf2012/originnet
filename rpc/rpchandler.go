@@ -13,11 +13,11 @@ type RPCMethodType func(arg ...interface{}) (interface{},error)
 
 type RpcMethodInfo struct {
 	method reflect.Method
-	param []reflect.Type
-	returns reflect.Type
+	tparam []reflect.Type
+	//returns reflect.Type
 
-	oParam interface{}
-	iparam []interface{}
+	oParam reflect.Value
+	iparam [] interface{}
 	ireturns interface{}
 }
 
@@ -48,6 +48,8 @@ func (slf *RpcHandler) InitRpcHandler(rpcHandler IRpcHandler,fun FuncRpcClient) 
 
 	slf.rpcHandler = rpcHandler
 	slf.mapfunctons = map[string]RpcMethodInfo{}
+	slf.funcRpcClient = fun
+
 	slf.RegisterRpc(rpcHandler)
 
 }
@@ -93,21 +95,19 @@ func (slf *RpcHandler) suitableMethods(method reflect.Method) error {
 
 		//第一个参数为返回参数
 		if i == 1 {
-			rpcMethodInfo.oParam = reflect.New(typ.In(i))
+			rpcMethodInfo.oParam = reflect.New(typ.In(i).Elem())
 		}else{
-			rpcMethodInfo.param = append(rpcMethodInfo.param,typ.In(i))
-			rpcMethodInfo.iparam = append(rpcMethodInfo.iparam,reflect.New(typ.In(i)))
+			rpcMethodInfo.tparam = append(rpcMethodInfo.tparam,typ.In(i))
+			rpcMethodInfo.iparam = append(rpcMethodInfo.iparam,reflect.New(typ.In(i).Elem()).Interface())
 		}
-
-
 	}
-
-	rpcMethodInfo.returns = typ.Out(0)
+/*
+	//rpcMethodInfo.returns = typ.Out(0)
 	if slf.isExportedOrBuiltinType(typ.Out(0))== false{
 		return fmt.Errorf( "rpc.Register: reply type of method %q is not exported\n", method.Name)
-	}
-	rpcMethodInfo.ireturns = reflect.New(typ.Out(0))
-
+	}*/
+	//rpcMethodInfo.ireturns = reflect.New(typ.Out(0))
+	rpcMethodInfo.method = method
 	slf.mapfunctons[slf.rpcHandler.GetName()+"."+method.Name] = rpcMethodInfo
 	return nil
 }
@@ -143,7 +143,7 @@ func (slf *RpcHandler) Call(serviceMethod string,reply interface{},args ...inter
 	}
 
 	//2.rpcclient调用
-	pCall := pClient.Go(serviceMethod,reply,args)
+	pCall := pClient.Go(serviceMethod,reply,args...)
 	pResult := pCall.Done()
 	return pResult.Err
 }
@@ -154,25 +154,34 @@ func (slf *RpcHandler) HandlerRpcRequest(request *RpcRequest) {
 	if ok == false {
 		err := fmt.Errorf("RpcHandler %s cannot find %s",slf.rpcHandler.GetName(),request.ServiceMethod)
 		log.Error("%s",err.Error())
-		request.RequestHandle(nil,err)
+		request.requestHandle(nil,err)
 		return
 	}
 
 	var paramList []reflect.Value
-
-	paramList = append(paramList,reflect.ValueOf(slf.GetRpcHandler())) //接受者
-	paramList = append(paramList,reflect.ValueOf(v.oParam)) //输出参数
-	//其他输入参数
-	for _,v := range request.InputParam {
-		paramList = append(paramList,reflect.ValueOf(v))
+	//var test []*string
+	err := processor.Unmarshal(request.InParam,&v.iparam)
+	if err!=nil {
+		err := fmt.Errorf("Call Rpc %s Param error %+v",request.ServiceMethod,err)
+		log.Error("%s",err.Error())
+		request.requestHandle(nil,err)
 	}
 
+	paramList = append(paramList,reflect.ValueOf(slf.GetRpcHandler())) //接受者
+	paramList = append(paramList,v.oParam) //输出参数
+
+	//其他输入参数
+	for _,iv := range v.iparam {
+		paramList = append(paramList,reflect.ValueOf(iv))
+	}
+
+	//paramList = append(paramList,reflect.ValueOf(in))
 	returnValues := v.method.Func.Call(paramList)
 	errInter := returnValues[0].Interface()
-	var err error
+	//var err error
 	if errInter != nil {
 		err = errInter.(error)
 	}
 
-	request.RequestHandle(v.oParam,err)
+	request.requestHandle(v.oParam.Interface(),err)
 }

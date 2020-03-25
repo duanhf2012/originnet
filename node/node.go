@@ -98,8 +98,10 @@ func Start() {
 }
 
 
-func Setup(s service.IService)  {
-	preSetupService = append(preSetupService,s)
+func Setup(s ...service.IService)  {
+	for _,sv := range s {
+		preSetupService = append(preSetupService,sv)
+	}
 }
 
 func GetService(servicename string) service.IService {
