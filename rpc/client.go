@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"fmt"
+	"github.com/duanhf2012/originnet/log"
 	"github.com/duanhf2012/originnet/network"
 	"math"
 	"sync"
@@ -60,21 +61,15 @@ func (slf *Client) Go(serviceMethod string,reply interface{}, args ...interface{
 	call.Reply = reply
 
 	request := &RpcRequest{}
-	//call.ServiceMethod = serviceMethod
 	call.Arg = args
 	slf.pendingLock.Lock()
-	slf.startSeq+=1
-
+	slf.startSeq += 1
 	call.Seq = slf.startSeq
-
-	//request.Seq = slf.startSeq
+	request.Seq = slf.startSeq
 	slf.pending[call.Seq] = call
 	slf.pendingLock.Unlock()
 
 	request.ServiceMethod = serviceMethod
-	request.InputParam =args
-	request.Seq = slf.startSeq
-
 	var herr error
 	request.InParam,herr = processor.Marshal(args)
 	if herr != nil {
@@ -102,22 +97,23 @@ type RequestHandler func(Returns interface{},Err error)
 
 type RpcRequest struct {
 	//packhead
-	ServiceMethod string   // format: "Service.Method"
 	Seq uint64// sequence number chosen by client
+	ServiceMethod string   // format: "Service.Method"
 
+	//packbody
 	InParam []byte
-	InputParam []interface{}
-
 	requestHandle RequestHandler
-	Data []byte
 }
 
 type RpcResponse struct {
-	ServiceMethod string   // format: "Service.Method"
+	//head
 	Seq           uint64   // sequence number chosen by client
-	Returns interface{}
 	Err error
+
+	//returns
+	Returns []byte
 }
+
 
 func (slf *Client) Run(){
 	for {
@@ -126,22 +122,30 @@ func (slf *Client) Run(){
 			slf.Close()
 			slf.Start()
 		}
+		//1.解析head
+		respone := &RpcResponse{}
+		err = processor.Unmarshal(bytes,respone)
+		if err != nil {
+			log.Error("rpcClient Unmarshal head error,error:%+v",err)
+			continue
+		}
 
 		slf.pendingLock.Lock()
-		defer  slf.pendingLock.Unlock()
-		var seq uint64 = 1
-		v,ok := slf.pending[seq]
-		if ok == true {
-			Respone := &RpcResponse{}
-			err = processor.Unmarshal(bytes,Respone)
+		v,ok := slf.pending[respone.Seq]
+		if ok == false {
+			log.Error("rpcClient cannot find seq %d in pending",respone.Seq)
+			slf.pendingLock.Unlock()
+		}else  {
+			delete(slf.pending,respone.Seq)
+			slf.pendingLock.Unlock()
+
+			err = processor.Unmarshal(respone.Returns,v.Reply)
 			if err != nil {
-				//error
-				break
+				log.Error("rpcClient Unmarshal body error,error:%+v",err)
+				continue
 			}
 
 			//发送至接受者
-			delete(slf.pending,seq)
-			v.Respone = Respone
 			v.done <- v
 		}
 

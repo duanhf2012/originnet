@@ -9,21 +9,14 @@ import (
 	"unicode/utf8"
 )
 
-type RPCMethodType func(arg ...interface{}) (interface{},error)
-
 type RpcMethodInfo struct {
 	method reflect.Method
-	tparam []reflect.Type
-	//returns reflect.Type
-
-	oParam reflect.Value
 	iparam [] interface{}
-	ireturns interface{}
+	oParam reflect.Value
 }
 
 type RpcHandler struct {
 	callRequest chan *RpcRequest
-	//callchannel chan *Call //待处理队列
 	rpcHandler IRpcHandler
 	mapfunctons map[string]RpcMethodInfo
 	funcRpcClient FuncRpcClient
@@ -51,7 +44,6 @@ func (slf *RpcHandler) InitRpcHandler(rpcHandler IRpcHandler,fun FuncRpcClient) 
 	slf.funcRpcClient = fun
 
 	slf.RegisterRpc(rpcHandler)
-
 }
 
 // Is this an exported - upper case - name?
@@ -97,16 +89,10 @@ func (slf *RpcHandler) suitableMethods(method reflect.Method) error {
 		if i == 1 {
 			rpcMethodInfo.oParam = reflect.New(typ.In(i).Elem())
 		}else{
-			rpcMethodInfo.tparam = append(rpcMethodInfo.tparam,typ.In(i))
 			rpcMethodInfo.iparam = append(rpcMethodInfo.iparam,reflect.New(typ.In(i).Elem()).Interface())
 		}
 	}
-/*
-	//rpcMethodInfo.returns = typ.Out(0)
-	if slf.isExportedOrBuiltinType(typ.Out(0))== false{
-		return fmt.Errorf( "rpc.Register: reply type of method %q is not exported\n", method.Name)
-	}*/
-	//rpcMethodInfo.ireturns = reflect.New(typ.Out(0))
+
 	rpcMethodInfo.method = method
 	slf.mapfunctons[slf.rpcHandler.GetName()+"."+method.Name] = rpcMethodInfo
 	return nil
@@ -128,8 +114,6 @@ func  (slf *RpcHandler) RegisterRpc(rpcHandler IRpcHandler) error {
 func (slf *RpcHandler) PushRequest(req *RpcRequest) {
 	slf.callRequest <- req
 }
-
-
 
 func (slf *RpcHandler) GetRpcRequestChan() (chan *RpcRequest) {
 	return slf.callRequest
@@ -175,10 +159,8 @@ func (slf *RpcHandler) HandlerRpcRequest(request *RpcRequest) {
 		paramList = append(paramList,reflect.ValueOf(iv))
 	}
 
-	//paramList = append(paramList,reflect.ValueOf(in))
 	returnValues := v.method.Func.Call(paramList)
 	errInter := returnValues[0].Interface()
-	//var err error
 	if errInter != nil {
 		err = errInter.(error)
 	}

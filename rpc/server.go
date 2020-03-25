@@ -118,9 +118,11 @@ func (agent *RpcAgent) Run() {
 		req.requestHandle = func(Returns interface{},Err error){
 		var rpcRespone RpcResponse
 			rpcRespone.Seq = req.Seq
-			rpcRespone.ServiceMethod = req.ServiceMethod
-			rpcRespone.Returns = Returns
 			rpcRespone.Err = Err
+			if Err==nil {
+				rpcRespone.Returns,rpcRespone.Err = processor.Marshal(Returns)
+			}
+
 			bytes,err :=  processor.Marshal(rpcRespone)
 			if err != nil {
 				log.Error("service method %s Marshal error:%+v!", req.ServiceMethod,err)
@@ -133,55 +135,12 @@ func (agent *RpcAgent) Run() {
 	rpcHandler.PushRequest(&req)
 
 	}
-	/*
-	for {
-		data, err := agent.conn.ReadMsg()
-		if err != nil {
-			log.Debug("read message: %v", err)
-			break
-		}
-
-		if agent.gate.Processor != nil {
-			msg, err := agent.gate.Processor.Unmarshal(data)
-			if err != nil {
-				log.Debug("unmarshal message error: %v", err)
-				break
-			}
-			err = agent.gate.Processor.Route(msg, a)
-			if err != nil {
-				log.Debug("route message error: %v", err)
-				break
-			}
-		}
-	}*/
-
 }
 
 func (agent *RpcAgent) OnClose() {
-	/*
-	if agent.gate.AgentChanRPC != nil {
-		err := agent.gate.AgentChanRPC.Call0("CloseAgent", agent)
-		if err != nil {
-			log.Error("chanrpc error: %v", err)
-		}
-	}
-
-	 */
 }
 
 func (agent *RpcAgent) WriteMsg(msg interface{}) {
-	/*
-	if agent.gate.Processor != nil {
-		data, err := agent.gate.Processor.Marshal(msg)
-		if err != nil {
-			log.Error("marshal message %v error: %v", reflect.TypeOf(msg), err)
-			return
-		}
-		err = agent.conn.WriteMsg(datagent...)
-		if err != nil {
-			log.Error("write message %v error: %v", reflect.TypeOf(msg), err)
-		}
-	}*/
 }
 
 func (agent *RpcAgent) LocalAddr() net.Addr {
@@ -201,8 +160,6 @@ func (agent *RpcAgent) Destroy() {
 }
 
 
-//Run()
-//OnClose()
 func (slf *Server) NewAgent(conn *network.TCPConn) network.Agent {
 	agent := &RpcAgent{conn: conn, rpcserver: slf}
 
