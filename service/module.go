@@ -104,21 +104,6 @@ func (slf *Module) ReleaseModule(moduleId int64){
 		pCron.Stop()
 	}
 
-	/*
-	moduleId int64
-		parent IModule        //父亲
-		child map[int64]IModule //孩子们
-		mapActiveTimer map[*timer.Timer]interface{}
-		mapActiveCron map[*timer.Cron]interface{}
-
-		dispatcher         *timer.Dispatcher //timer
-
-		//根结点
-		ancestor IModule      //始祖
-		seedModuleId int64    //模块id种子
-		descendants map[int64]IModule//始祖的后裔们
-	*/
-
 	delete(slf.child,moduleId)
 	delete (slf.ancestor.getBaseModule().(*Module).descendants,moduleId)
 
