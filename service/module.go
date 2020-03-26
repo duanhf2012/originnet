@@ -71,7 +71,6 @@ func (slf *Module) AddModule(module IModule) (int64,error){
 		return 0,fmt.Errorf("Exists module id %d",module.GetModuleId())
 	}
 
-
 	pAddModule.self = module
 	pAddModule.parent = slf.self
 	pAddModule.dispatcher = slf.GetAncestor().getBaseModule().(*Module).dispatcher
