@@ -63,7 +63,12 @@ func (slf *Module3) OnInit() error {
 func (slf *Module4) OnInit() error {
 	fmt.Printf("I'm Module4:%d\n",slf.GetModuleId())
 
+	slf.AfterFunc(time.Second*10,slf.TimerTest)
 	return nil
+}
+
+func (slf *Module4) TimerTest(){
+	fmt.Printf("Module4 tigger timer\n")
 }
 
 func (slf *Module1) OnRelease() {
