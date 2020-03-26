@@ -64,8 +64,8 @@ func (slf *Cluster) Init(currentNodeId int) error{
 		rpcinfo.nodeinfo = nodeinfo
 		rpcinfo.client = &rpc.Client{}
 		if nodeinfo.NodeId == currentNodeId {
-			//rpcinfo.client.Connect("localhost")
-			rpcinfo.client.Connect(nodeinfo.ListenAddr)
+			rpcinfo.client.Connect("localhost")
+			//rpcinfo.client.Connect(nodeinfo.ListenAddr)
 		}else{
 			rpcinfo.client.Connect(nodeinfo.ListenAddr)
 		}
@@ -104,36 +104,47 @@ func (slf *Cluster) GetRpcClient(nodeid int) *rpc.Client {
 
 //servicename.method
 func Call(irecv rpc.IRpcHandler,serviceMethod string,reply interface{},args ...interface{}) error {
-	pClient,err := GetRpcClient(serviceMethod)
+	pClientList,err := GetRpcClient(serviceMethod)
 	if err != nil {
 		log.Error("Call serviceMethod is error:%+v!",err)
 		return err
 	}
-
+	if len(pClientList) >1 {
+		log.Error("Cannot call more then 1 node!")
+		return err
+	}
 	//2.rpcclient调用
-	pCall := pClient.Go(serviceMethod,reply,args)
+	pCall := pClientList[0].Go(serviceMethod,reply,args)
 	pResult := pCall.Done()
 	return pResult.Err
 }
 
 
-func GetRpcClient(serviceMethod string) (*rpc.Client,error) {
+func GetRpcClient(serviceMethod string) ([]*rpc.Client,error) {
 	serviceAndMethod := strings.Split(serviceMethod,".")
 	if len(serviceAndMethod)!=2 {
 		return nil,fmt.Errorf("servicemethod param  %s is error!",serviceMethod)
 	}
 
 	//1.找到对应的rpcnodeid
+	var rpcClientList []*rpc.Client
 	nodeidList := GetCluster().GetNodeIdByService(serviceAndMethod[0])
 	if len(nodeidList) ==0 {
-		return nil,fmt.Errorf("Cannot Find %s nodeid",serviceMethod)
-	}else if len(nodeidList) >1 {
-		return nil,fmt.Errorf("Find %s more than 1 nodeid",serviceMethod)
-	}
-	pClient := GetCluster().GetRpcClient(nodeidList[0])
-	if pClient==nil {
-		return nil,fmt.Errorf("Cannot connect node id %d",nodeidList[0])
+		return rpcClientList,fmt.Errorf("Cannot Find %s nodeid",serviceMethod)
 	}
 
-	return pClient,nil
+	for _,nodeid:= range nodeidList {
+		pClient := GetCluster().GetRpcClient(nodeid)
+		if pClient==nil {
+			log.Error("Cannot connect node id %d",nodeid)
+			continue
+		}
+		rpcClientList = append(rpcClientList,pClient)
+	}
+
+	return rpcClientList,nil
+}
+
+func GetRpcServer() *rpc.Server{
+	return &cluster.rpcServer
 }

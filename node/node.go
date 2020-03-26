@@ -71,7 +71,7 @@ func Init(){
 
 	//3.初始化预安装的服务
 	for _,s := range preSetupService {
-		s.Init(s,cluster.GetRpcClient)
+		s.Init(s,cluster.GetRpcClient,cluster.GetRpcServer)
 		//是否配置的service
 		if cluster.GetCluster().IsConfigService(s.GetName()) == false {
 			continue

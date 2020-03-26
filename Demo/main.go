@@ -32,8 +32,11 @@ func (slf *TestServiceCall) OnInit() error {
 func  (slf *TestServiceCall) Run(){
 	var ret int
 	var input int = 100000
+	bT := time.Now()            // 开始时间
 
-	slf.Call("TestService2.RPC_Test",&ret,&input)
+	err := slf.Call("TestServiceCall.RPC_Test",&ret,&input)
+	eT := time.Since(bT)      // 从开始到当前所消耗的时间
+	fmt.Print(err,eT.Nanoseconds())
 }
 
 func (slf *TestService1) RPC_Test(a *int,b *int) error {
@@ -47,7 +50,7 @@ func (slf *TestService1) OnInit() error {
 	return nil
 }
 
-func (slf *TestService2) RPC_Test(a *int,b *int) error {
+func (slf *TestServiceCall) RPC_Test(a *int,b *int) error {
 	fmt.Printf("TestService2\n")
 	*a = *b
 	return nil

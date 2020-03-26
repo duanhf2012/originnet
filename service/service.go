@@ -13,7 +13,7 @@ var closeSig chan bool
 var timerDispatcherLen = 10
 
 type IService interface {
-	Init(iservice IService,fun rpc.FuncRpcClient)
+	Init(iservice IService,getClientFun rpc.FuncRpcClient,getServerFun rpc.FuncRpcServer)
 	GetName() string
 
 	OnInit() error
@@ -33,11 +33,11 @@ type Service struct {
 	this    IService
 }
 
-func (slf *Service) Init(iservice IService,fun rpc.FuncRpcClient) {
+func (slf *Service) Init(iservice IService,getClientFun rpc.FuncRpcClient,getServerFun rpc.FuncRpcServer) {
 	slf.name = reflect.Indirect(reflect.ValueOf(iservice)).Type().Name()
 	slf.dispatcher =timer.NewDispatcher(timerDispatcherLen)
 	slf.this = iservice
-	slf.InitRpcHandler(iservice.(rpc.IRpcHandler),fun)
+	slf.InitRpcHandler(iservice.(rpc.IRpcHandler),getClientFun,getServerFun)
 
 	slf.this.OnInit()
 }

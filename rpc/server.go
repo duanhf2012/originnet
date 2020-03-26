@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"fmt"
 	"github.com/duanhf2012/originnet/log"
 	"github.com/duanhf2012/originnet/network"
 	"math"
@@ -165,3 +166,38 @@ func (slf *Server) NewAgent(conn *network.TCPConn) network.Agent {
 
 	return agent
 }
+
+func (slf *Server) myselfRpcHandlerGo(handlerName string,methodName string,reply interface{}, args ...interface{}) error {
+	rpcHandler := slf.rpcHandleFinder.FindRpcHandler(handlerName)
+	if rpcHandler== nil {
+		err := fmt.Errorf("service method %s.%s not config!", handlerName,methodName)
+		log.Error("%s",err.Error())
+		return err
+	}
+
+	return rpcHandler.CallMethod(fmt.Sprintf("%s.%s",handlerName,methodName),reply,args...)
+}
+
+func (slf *Server) rpcHandlerGo(handlerName string,methodName string,reply interface{}, args ...interface{}) *Call {
+	pCall := &Call{}
+	pCall.done = make( chan *Call,1)
+	rpcHandler := slf.rpcHandleFinder.FindRpcHandler(handlerName)
+	if rpcHandler== nil {
+		pCall.Err = fmt.Errorf("service method %s.%s not config!", handlerName,methodName)
+		log.Error("%s",pCall.Err.Error())
+		pCall.done <- pCall
+		return pCall
+	}
+	var req RpcRequest
+	req.ServiceMethod = fmt.Sprintf("%s.%s",handlerName,methodName)
+	req.localParam = args
+	req.localReply = reply
+	req.requestHandle = func(Returns interface{},Err error){
+		pCall.Err = Err
+		pCall.done <- pCall
+	}
+
+	rpcHandler.PushRequest(&req)
+	return pCall
+}
+

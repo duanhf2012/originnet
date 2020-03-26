@@ -5,16 +5,16 @@ import (
 	"github.com/duanhf2012/originnet/log"
 	"github.com/duanhf2012/originnet/network"
 	"math"
+	"strings"
 	"sync"
 	"time"
 )
-//go:generate msgp
+
 type Client struct {
 	blocalhost bool
 	network.TCPClient
 	conn *network.TCPConn
 
-	//
 	pendingLock sync.RWMutex
 	startSeq uint64
 	pending map[uint64]*Call
@@ -27,13 +27,10 @@ func (slf *Client) NewClientAgent(conn *network.TCPConn) network.Agent {
 
 func (slf *Client) Connect(addr string) error {
 	slf.Addr = addr
-
-	/*
-	if addr == "" || strings.Index(addr,"localhost")!=-1 {
+	if strings.Index(addr,"localhost") == 0 {
 		slf.blocalhost = true
 		return nil
-	}*/
-
+	}
 	slf.ConnNum = 1
 	slf.ConnectInterval = time.Second*2
 	slf.PendingWriteNum = 10000
@@ -82,7 +79,6 @@ func (slf *Client) Go(serviceMethod string,reply interface{}, args ...interface{
 		call.Err = err
 		return call
 	}
-	fmt.Print(string(bytes))
 
 	err = slf.conn.WriteMsg(bytes)
 	if err != nil {
@@ -94,7 +90,6 @@ func (slf *Client) Go(serviceMethod string,reply interface{}, args ...interface{
 
 type RequestHandler func(Returns interface{},Err error)
 
-
 type RpcRequest struct {
 	//packhead
 	Seq uint64// sequence number chosen by client
@@ -102,6 +97,8 @@ type RpcRequest struct {
 
 	//packbody
 	InParam []byte
+	localReply interface{}
+	localParam []interface{} //本地调用的参数列表
 	requestHandle RequestHandler
 }
 
@@ -148,13 +145,13 @@ func (slf *Client) Run(){
 			//发送至接受者
 			v.done <- v
 		}
-
-
 	}
 
 }
 
 func (slf *Client) OnClose(){
-	//关闭时，重新连接
-	slf.Start()
+	if slf.blocalhost== false{
+		//关闭时，重新连接
+		slf.Start()
+	}
 }
