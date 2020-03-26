@@ -114,7 +114,7 @@ func Call(irecv rpc.IRpcHandler,serviceMethod string,reply interface{},args ...i
 		return err
 	}
 	//2.rpcclient调用
-	pCall := pClientList[0].Go(serviceMethod,reply,args)
+	pCall := pClientList[0].Go(false,serviceMethod,reply,args)
 	pResult := pCall.Done()
 	return pResult.Err
 }

@@ -20,6 +20,7 @@ type IModule interface {
 	OnRelease()
 
 	getBaseModule() IModule
+	GetService() IService
 }
 
 //1.管理各模块树层关系
@@ -173,4 +174,8 @@ func (slf *Module) CronFunc(cronExpr *timer.CronExpr, cb func()) *timer.Cron {
 }
 
 func (slf *Module) OnRelease(){
+}
+
+func (slf *Module) GetService() IService {
+	return slf.GetAncestor().(IService)
 }

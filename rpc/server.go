@@ -116,25 +116,29 @@ func (agent *RpcAgent) Run() {
 			log.Error("service method %s not config!", req.ServiceMethod)
 			continue
 		}
-		req.requestHandle = func(Returns interface{},Err error){
-		var rpcRespone RpcResponse
-			rpcRespone.Seq = req.Seq
-			rpcRespone.Err = Err
-			if Err==nil {
-				rpcRespone.Returns,rpcRespone.Err = processor.Marshal(Returns)
-			}
+		if req.NoReply == false {
+			req.requestHandle = func(Returns interface{},Err error){
+				var rpcRespone RpcResponse
+				rpcRespone.Seq = req.Seq
+				rpcRespone.Err = Err
+				if Err==nil {
+					rpcRespone.Returns,rpcRespone.Err = processor.Marshal(Returns)
+				}
 
-			bytes,err :=  processor.Marshal(rpcRespone)
-			if err != nil {
-				log.Error("service method %s Marshal error:%+v!", req.ServiceMethod,err)
-				return
-			}
+				bytes,err :=  processor.Marshal(rpcRespone)
+				if err != nil {
+					log.Error("service method %s Marshal error:%+v!", req.ServiceMethod,err)
+					return
+				}
 
-			agent.conn.WriteMsg(bytes)
+				err = agent.conn.WriteMsg(bytes)
+				if err != nil {
+					log.Error("Rpc %s return is error:%+v",req.ServiceMethod,err)
+				}
+			}
 		}
 
-	rpcHandler.PushRequest(&req)
-
+		rpcHandler.PushRequest(&req)
 	}
 }
 
@@ -178,7 +182,8 @@ func (slf *Server) myselfRpcHandlerGo(handlerName string,methodName string,reply
 	return rpcHandler.CallMethod(fmt.Sprintf("%s.%s",handlerName,methodName),reply,args...)
 }
 
-func (slf *Server) rpcHandlerGo(handlerName string,methodName string,reply interface{}, args ...interface{}) *Call {
+
+func (slf *Server) rpcHandlerGo(noReply bool,handlerName string,methodName string,reply interface{}, args ...interface{}) *Call {
 	pCall := &Call{}
 	pCall.done = make( chan *Call,1)
 	rpcHandler := slf.rpcHandleFinder.FindRpcHandler(handlerName)
@@ -192,9 +197,13 @@ func (slf *Server) rpcHandlerGo(handlerName string,methodName string,reply inter
 	req.ServiceMethod = fmt.Sprintf("%s.%s",handlerName,methodName)
 	req.localParam = args
 	req.localReply = reply
-	req.requestHandle = func(Returns interface{},Err error){
-		pCall.Err = Err
-		pCall.done <- pCall
+	req.NoReply = noReply
+
+	if noReply == false {
+		req.requestHandle = func(Returns interface{},Err error){
+			pCall.Err = Err
+			pCall.done <- pCall
+		}
 	}
 
 	rpcHandler.PushRequest(&req)

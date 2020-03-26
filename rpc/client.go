@@ -52,12 +52,13 @@ func (slf *Client) Connect(addr string) error {
 	return nil
 }
 
-func (slf *Client) Go(serviceMethod string,reply interface{}, args ...interface{}) *Call {
+func (slf *Client) Go(noReply bool,serviceMethod string,reply interface{}, args ...interface{}) *Call {
 	call := new(Call)
 	call.done = make(chan *Call,1)
 	call.Reply = reply
 
 	request := &RpcRequest{}
+	request.NoReply = noReply
 	call.Arg = args
 	slf.pendingLock.Lock()
 	slf.startSeq += 1
@@ -100,6 +101,7 @@ type RpcRequest struct {
 	localReply interface{}
 	localParam []interface{} //本地调用的参数列表
 	requestHandle RequestHandler
+	NoReply bool //是否需要返回
 }
 
 type RpcResponse struct {
