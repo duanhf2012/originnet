@@ -15,7 +15,7 @@ type IModule interface {
 	GetAncestor()IModule
 	ReleaseModule(moduleId int64)
 	NewModuleId() int64
-
+	GetParent()IModule
 	OnInit() error
 	OnRelease()
 
@@ -73,7 +73,7 @@ func (slf *Module) AddModule(module IModule) (int64,error){
 
 
 	pAddModule.self = module
-	pAddModule.parent = slf
+	pAddModule.parent = slf.self
 	pAddModule.dispatcher = slf.GetAncestor().getBaseModule().(*Module).dispatcher
 	pAddModule.ancestor = slf.ancestor
 
@@ -90,7 +90,7 @@ func (slf *Module) AddModule(module IModule) (int64,error){
 
 func (slf *Module) ReleaseModule(moduleId int64){
 	//pBaseModule :=  slf.GetModule(moduleId).getBaseModule().(*Module)
-	pModule := slf.GetModule(moduleId).(*Module)
+	pModule := slf.GetModule(moduleId).getBaseModule().(*Module)
 
 	//释放子孙
 	for id,_ := range pModule.child {
@@ -148,11 +148,16 @@ func (slf *Module) GetModule(moduleId int64) IModule{
 	if ok == false{
 		return nil
 	}
-	return iModule.getBaseModule()
+	return iModule
 }
 
 func (slf *Module) getBaseModule() IModule{
 	return slf
+}
+
+
+func (slf *Module) GetParent()IModule{
+	return slf.parent
 }
 
 func (slf *Module) AfterFunc(d time.Duration, cb func()) *timer.Timer {
