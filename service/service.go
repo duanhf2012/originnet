@@ -5,7 +5,6 @@ import (
 	"github.com/duanhf2012/originnet/util/timer"
 	"reflect"
 	"sync"
-	"time"
 )
 
 
@@ -25,8 +24,9 @@ type IService interface {
 
 
 type Service struct {
+	Module
+
 	rpc.RpcHandler   //rpc
-	dispatcher         *timer.Dispatcher //timer
 	name string    //service name
 	closeSig chan bool
 	wg      sync.WaitGroup
@@ -38,6 +38,11 @@ func (slf *Service) Init(iservice IService,getClientFun rpc.FuncRpcClient,getSer
 	slf.dispatcher =timer.NewDispatcher(timerDispatcherLen)
 	slf.this = iservice
 	slf.InitRpcHandler(iservice.(rpc.IRpcHandler),getClientFun,getServerFun)
+
+	//初始化祖先
+	slf.ancestor = slf
+	slf.seedModuleId =InitModuleId
+	slf.descendants = map[int64]IModule{}
 
 	slf.this.OnInit()
 }
@@ -84,14 +89,6 @@ func (slf *Service) OnInit() error {
 	return nil
 }
 
-
-func (slf *Service) AfterFunc(d time.Duration, cb func()) *timer.Timer {
-	return slf.dispatcher.AfterFunc(d, cb)
-}
-
-func (slf *Service) CronFunc(cronExpr *timer.CronExpr, cb func()) *timer.Cron {
-	return slf.dispatcher.CronFunc(cronExpr, cb)
-}
 
 func (slf *Service) Wait(){
 	slf.wg.Wait()

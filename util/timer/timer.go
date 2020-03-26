@@ -19,6 +19,7 @@ func NewDispatcher(l int) *Dispatcher {
 type Timer struct {
 	t  *time.Timer
 	cb func()
+	cbex func(*Timer)
 }
 
 func (t *Timer) Stop() {
@@ -40,14 +41,27 @@ func (t *Timer) Cb() {
 		}
 	}()
 
-	if t.cb != nil {
+
+	if t.cbex!=nil {
+		t.cbex(t)
+	}else{
 		t.cb()
 	}
+
 }
 
 func (disp *Dispatcher) AfterFunc(d time.Duration, cb func()) *Timer {
 	t := new(Timer)
 	t.cb = cb
+	t.t = time.AfterFunc(d, func() {
+		disp.ChanTimer <- t
+	})
+	return t
+}
+
+func (disp *Dispatcher) AfterFuncEx(d time.Duration, cbex func(timer *Timer)) *Timer {
+	t := new(Timer)
+	t.cbex = cbex
 	t.t = time.AfterFunc(d, func() {
 		disp.ChanTimer <- t
 	})
@@ -78,6 +92,33 @@ func (disp *Dispatcher) CronFunc(cronExpr *CronExpr, _cb func()) *Cron {
 	var cb func()
 	cb = func() {
 		defer _cb()
+
+		now := time.Now()
+		nextTime := cronExpr.Next(now)
+		if nextTime.IsZero() {
+			return
+		}
+		c.t = disp.AfterFunc(nextTime.Sub(now), cb)
+	}
+
+	c.t = disp.AfterFunc(nextTime.Sub(now), cb)
+	return c
+}
+
+
+func (disp *Dispatcher) CronFuncEx(cronExpr *CronExpr, _cb func(*Cron)) *Cron {
+	c := new(Cron)
+
+	now := time.Now()
+	nextTime := cronExpr.Next(now)
+	if nextTime.IsZero() {
+		return c
+	}
+
+	// callback
+	var cb func()
+	cb = func() {
+		defer _cb(c)
 
 		now := time.Now()
 		nextTime := cronExpr.Next(now)
