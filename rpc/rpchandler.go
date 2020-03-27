@@ -11,6 +11,7 @@ import (
 
 type FuncRpcClient func(serviceMethod string) ([]*Client,error)
 type FuncRpcServer func() (*Server)
+var NilError = reflect.Zero(reflect.TypeOf((*error)(nil)).Elem())
 
 type RpcMethodInfo struct {
 	method reflect.Method
@@ -24,6 +25,8 @@ type RpcHandler struct {
 	mapfunctons map[string]RpcMethodInfo
 	funcRpcClient FuncRpcClient
 	funcRpcServer FuncRpcServer
+
+	callResponeCallBack chan *Call //异步返回的回调
 }
 
 type IRpcHandler interface {
@@ -32,6 +35,10 @@ type IRpcHandler interface {
 	GetRpcHandler() IRpcHandler
 	PushRequest(callinfo *RpcRequest)
 	HandlerRpcRequest(request *RpcRequest)
+	HandlerRpcResponeCB(call *Call)
+
+	GetRpcRequestChan() chan *RpcRequest
+	GetRpcResponeChan() chan *Call
 	CallMethod(ServiceMethod string,reply interface{},param ...interface{}) error
 }
 
@@ -39,10 +46,9 @@ func (slf *RpcHandler) GetRpcHandler() IRpcHandler{
 	return slf.rpcHandler
 }
 
-
-
 func (slf *RpcHandler) InitRpcHandler(rpcHandler IRpcHandler,getClientFun FuncRpcClient,getServerFun FuncRpcServer) {
 	slf.callRequest = make(chan *RpcRequest,10000)
+	slf.callResponeCallBack = make(chan *Call,10000)
 
 	slf.rpcHandler = rpcHandler
 	slf.mapfunctons = map[string]RpcMethodInfo{}
@@ -125,7 +131,18 @@ func (slf *RpcHandler) GetRpcRequestChan() (chan *RpcRequest) {
 	return slf.callRequest
 }
 
+func (slf *RpcHandler) GetRpcResponeChan() chan *Call{
+	return slf.callResponeCallBack
+}
 
+func (slf *RpcHandler) HandlerRpcResponeCB(call *Call){
+	if call.Err == nil {
+		call.callback.Call([]reflect.Value{reflect.ValueOf(call.Reply),NilError})
+	}else{
+		call.callback.Call([]reflect.Value{reflect.ValueOf(call.Reply),reflect.ValueOf(call.Err)})
+	}
+
+}
 
 func (slf *RpcHandler) HandlerRpcRequest(request *RpcRequest) {
 	v,ok := slf.mapfunctons[request.ServiceMethod]
@@ -157,11 +174,9 @@ func (slf *RpcHandler) HandlerRpcRequest(request *RpcRequest) {
 
 	paramList = append(paramList,reflect.ValueOf(slf.GetRpcHandler())) //接受者
 	if request.localReply!=nil {
-		paramList = append(paramList,reflect.ValueOf(request.localReply))
-	}else{
-		paramList = append(paramList,v.oParam) //输出参数
+		v.oParam = reflect.ValueOf(request.localReply)
 	}
-
+	paramList = append(paramList,v.oParam) //输出参数
 	//其他输入参数
 	for _,iv := range v.iparam {
 		paramList = append(paramList,reflect.ValueOf(iv))
@@ -284,9 +299,17 @@ func (slf *RpcHandler) Call(serviceMethod string,reply interface{},args ...inter
 	return pResult.Err
 }
 
-//
-/*
-func (slf *RpcHandler) AsycCall(serviceMethod string,callback func(reply interface{}),args ...interface{}) error {
+
+
+
+
+func (slf *RpcHandler) AsyncCall(serviceMethod string,callback interface{},args ...interface{}) error {
+	fVal := reflect.ValueOf(callback)
+	if fVal.Kind()!=reflect.Func{
+		return fmt.Errorf("input function is error!")
+	}
+
+	reply := reflect.New(fVal.Type().In(0).Elem()).Interface()
 	pClientList,err := slf.funcRpcClient(serviceMethod)
 	if err != nil {
 		log.Error("Call serviceMethod is error:%+v!",err)
@@ -311,19 +334,31 @@ func (slf *RpcHandler) AsycCall(serviceMethod string,callback func(reply interfa
 		}
 		//调用自己rpcHandler处理器
 		if sMethod[0] == slf.rpcHandler.GetName() { //自己服务调用
-			//
-			return pLocalRpcServer.myselfRpcHandlerGo(sMethod[0],sMethod[1],reply,args...)
+			err := pLocalRpcServer.myselfRpcHandlerGo(sMethod[0],sMethod[1],reply,args...)
+			if err == nil {
+				fVal.Call([]reflect.Value{reflect.ValueOf(reply),NilError})
+			}else{
+				fVal.Call([]reflect.Value{reflect.ValueOf(reply),reflect.ValueOf(err)})
+			}
+
 		}
+
 		//其他的rpcHandler的处理器
+		if callback!=nil {
+			return  pLocalRpcServer.rpcHandlerAsyncGo(slf,false,sMethod[0],sMethod[1],reply,fVal,args...)
+
+		}
 		pCall := pLocalRpcServer.rpcHandlerGo(false,sMethod[0],sMethod[1],reply,args...)
 		pResult := pCall.Done()
 		return pResult.Err
 	}
 
 	//跨node调用
-	pCall := pClient.Go(false,serviceMethod,reply,args...)
-	pResult := pCall.Done()
-	return pResult.Err
+	return pClient.AsycGo(slf,serviceMethod,reply,fVal,args...)
 }
 
- */
+func (slf *RpcHandler) GetName() string{
+	return slf.rpcHandler.GetName()
+}
+
+

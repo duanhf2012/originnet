@@ -60,11 +60,14 @@ func (slf *Service) Run() {
 	var bStop = false
 	for{
 		rpcRequestChan := slf.GetRpcRequestChan()
+		rpcResponeCallBack := slf.GetRpcResponeChan()
 		select {
 		case <- closeSig:
 			bStop = true
 		case rpcRequest :=<- rpcRequestChan:
 			slf.GetRpcHandler().HandlerRpcRequest(rpcRequest)
+			case rpcResponeCB := <- rpcResponeCallBack:
+				slf.GetRpcHandler().HandlerRpcResponeCB(rpcResponeCB)
 		case t := <- slf.dispatcher.ChanTimer:
 			t.Cb()
 		}

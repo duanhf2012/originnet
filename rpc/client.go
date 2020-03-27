@@ -5,6 +5,7 @@ import (
 	"github.com/duanhf2012/originnet/log"
 	"github.com/duanhf2012/originnet/network"
 	"math"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -50,6 +51,44 @@ func (slf *Client) Connect(addr string) error {
 	slf.pendingLock.Unlock()
 	slf.Start()
 	return nil
+}
+
+func (slf *Client) AsycGo(rpcHandler IRpcHandler,serviceMethod string,replyParam interface{},callback reflect.Value, args ...interface{}) error {
+	call := new(Call)
+	call.Reply = replyParam
+	call.callback = &callback
+	call.rpcHandler = rpcHandler
+
+	request := &RpcRequest{}
+	request.NoReply = false
+	call.Arg = args
+	slf.pendingLock.Lock()
+	slf.startSeq += 1
+	call.Seq = slf.startSeq
+	request.Seq = slf.startSeq
+	slf.pending[call.Seq] = call
+	slf.pendingLock.Unlock()
+
+	request.ServiceMethod = serviceMethod
+	var herr error
+	request.InParam,herr = processor.Marshal(args)
+	if herr != nil {
+		return herr
+	}
+
+	bytes,err := processor.Marshal(request)
+	if err != nil {
+		return err
+	}
+	if slf.conn == nil {
+		return fmt.Errorf("Rpc server is disconnect,call %s is fail!",serviceMethod)
+	}
+	err = slf.conn.WriteMsg(bytes)
+	if err != nil {
+		call.Err = err
+	}
+
+	return call.Err
 }
 
 func (slf *Client) Go(noReply bool,serviceMethod string,reply interface{}, args ...interface{}) *Call {
@@ -102,6 +141,7 @@ type RpcRequest struct {
 	localParam []interface{} //本地调用的参数列表
 	requestHandle RequestHandler
 	NoReply bool //是否需要返回
+	callback *reflect.Value
 }
 
 type RpcResponse struct {
@@ -144,8 +184,13 @@ func (slf *Client) Run(){
 				continue
 			}
 
-			//发送至接受者
-			v.done <- v
+			if v.callback.IsValid() {
+				 v.rpcHandler.(*RpcHandler).callResponeCallBack<-v
+			}else{
+				//发送至接受者
+				v.done <- v
+			}
+
 		}
 	}
 

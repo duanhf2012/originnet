@@ -62,8 +62,8 @@ func (slf *Module3) OnInit() error {
 
 func (slf *Module4) OnInit() error {
 	fmt.Printf("I'm Module4:%d\n",slf.GetModuleId())
-	pService := slf.GetService().(*TestServiceCall)
-	pService.RPC_Test(nil,nil)
+	//pService := slf.GetService().(*TestServiceCall)
+	//pService.RPC_Test(nil,nil)
 	slf.AfterFunc(time.Second*10,slf.TimerTest)
 	return nil
 }
@@ -86,7 +86,7 @@ func (slf *Module4) OnRelease() {
 }
 
 func (slf *TestServiceCall) OnInit() error {
-	//slf.AfterFunc(time.Second*1,slf.Run)
+	slf.AfterFunc(time.Second*1,slf.Run)
 	moduleid1,_ = slf.AddModule(&Module1{})
 	moduleid2,_ = slf.AddModule(&Module2{})
 	fmt.Print(moduleid1,moduleid2)
@@ -102,18 +102,23 @@ func  (slf *TestServiceCall) Release(){
 }
 
 func  (slf *TestServiceCall) Run(){
-	var ret int
+	//var ret int
 	var input int = 100000
 	bT := time.Now()            // 开始时间
 
-	err := slf.Call("TestServiceCall.RPC_Test",&ret,&input)
+	//err := slf.Call("TestServiceCall.RPC_Test",&ret,&input)
+	err := slf.AsyncCall("TestService1.RPC_Test", func(reply *int, err error) {
+		fmt.Print(*reply,"\n",err)
+	},&input)
+
+
 	eT := time.Since(bT)      // 从开始到当前所消耗的时间
 	fmt.Print(err,eT.Nanoseconds())
 }
 
 func (slf *TestService1) RPC_Test(a *int,b *int) error {
 	fmt.Printf("TestService1\n")
-	*a = *b*1
+	*a = *b*2
 	//slf.AfterFunc(time.Second,slf.Test)
 	return nil
 }

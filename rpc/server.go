@@ -6,6 +6,7 @@ import (
 	"github.com/duanhf2012/originnet/network"
 	"math"
 	"net"
+	"reflect"
 	"strings"
 )
 
@@ -21,6 +22,8 @@ type Call struct {
 	Err error
 	done          chan *Call  // Strobes when call is complete.
 	connid int
+	callback *reflect.Value
+	rpcHandler IRpcHandler
 }
 
 func (slf *Call) Done() *Call{
@@ -210,3 +213,34 @@ func (slf *Server) rpcHandlerGo(noReply bool,handlerName string,methodName strin
 	return pCall
 }
 
+
+
+func (slf *Server) rpcHandlerAsyncGo(callerRpcHandler IRpcHandler,noReply bool,handlerName string,methodName string,reply interface{},callback reflect.Value, args ...interface{}) error {
+	pCall := &Call{}
+	//pCall.done = make( chan *Call,1)
+	pCall.rpcHandler = callerRpcHandler
+	pCall.callback = &callback
+	rpcHandler := slf.rpcHandleFinder.FindRpcHandler(handlerName)
+	if rpcHandler== nil {
+		err := fmt.Errorf("service method %s.%s not config!", handlerName,methodName)
+		log.Error("%+v",err)
+		return err
+	}
+
+	var req RpcRequest
+	req.ServiceMethod = fmt.Sprintf("%s.%s",handlerName,methodName)
+	req.localParam = args
+	req.localReply = reply
+	req.NoReply = noReply
+
+	if noReply == false {
+		req.requestHandle = func(Returns interface{},Err error){
+			pCall.Err = Err
+			pCall.Reply = Returns
+			pCall.rpcHandler.(*RpcHandler).callResponeCallBack<-pCall
+		}
+	}
+
+	rpcHandler.PushRequest(&req)
+	return nil
+}

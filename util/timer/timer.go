@@ -28,19 +28,20 @@ func (t *Timer) Stop() {
 }
 
 func (t *Timer) Cb() {
+	/*
 	defer func() {
 		t.cb = nil
 		if r := recover(); r != nil {
-			/*if conf.LenStackBuf > 0 {
+			if conf.LenStackBuf > 0 {
 				buf := make([]byte, conf.LenStackBuf)
 				l := runtime.Stack(buf, false)
 				log.Error("%v: %s", r, buf[:l])
 			} else {
 				log.Error("%v", r)
-			}*/
+			}
 		}
 	}()
-
+	*/
 
 	if t.cbex!=nil {
 		t.cbex(t)
