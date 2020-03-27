@@ -47,8 +47,8 @@ func (slf *RpcHandler) GetRpcHandler() IRpcHandler{
 }
 
 func (slf *RpcHandler) InitRpcHandler(rpcHandler IRpcHandler,getClientFun FuncRpcClient,getServerFun FuncRpcServer) {
-	slf.callRequest = make(chan *RpcRequest,10000)
-	slf.callResponeCallBack = make(chan *Call,10000)
+	slf.callRequest = make(chan *RpcRequest,100000)
+	slf.callResponeCallBack = make(chan *Call,100000)
 
 	slf.rpcHandler = rpcHandler
 	slf.mapfunctons = map[string]RpcMethodInfo{}
@@ -174,10 +174,8 @@ func (slf *RpcHandler) HandlerRpcRequest(request *RpcRequest) {
 	if request.localReply!=nil {
 		v.oParam = reflect.ValueOf(request.localReply)
 	}
-	paramList = append(paramList,v.oParam) //输出参数
-	//其他输入参数
 	paramList = append(paramList,reflect.ValueOf(v.iparam))
-
+	paramList = append(paramList,v.oParam) //输出参数
 
 	returnValues := v.method.Func.Call(paramList)
 	errInter := returnValues[0].Interface()
@@ -353,7 +351,7 @@ func (slf *RpcHandler) GetName() string{
 //func (slf *RpcHandler) asyncCallRpc(serviceMethod string,mutiCoroutine bool,callback interface{},args ...interface{}) error {
 //func (slf *RpcHandler) callRpc(serviceMethod string,reply interface{},mutiCoroutine bool,args ...interface{}) error {
 //func (slf *RpcHandler) goRpc(serviceMethod string,mutiCoroutine bool,args ...interface{}) error {
-
+//(reply *int,err error) {}
 func (slf *RpcHandler) AsyncCall(serviceMethod string,args interface{},callback interface{}) error {
 	return slf.asyncCallRpc(serviceMethod,false,args,callback)
 }
