@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/duanhf2012/originnet/node"
 	"github.com/duanhf2012/originnet/service"
+	"github.com/duanhf2012/originnet/sysmodule"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type TestService2 struct {
 
 type TestServiceCall struct {
 	service.Service
+	dbModule sysmodule.DBModule
 }
 
 func init(){
@@ -91,8 +93,13 @@ func (slf *TestServiceCall) OnInit() error {
 	moduleid2,_ = slf.AddModule(&Module2{})
 	fmt.Print(moduleid1,moduleid2)
 
+	slf.dbModule = sysmodule.DBModule{}
+	slf.dbModule.Init(10,3, "192.168.0.5:3306", "root", "Root!!2018", "Matrix")
+	slf.dbModule.SetQuerySlowTime(time.Second * 3)
+	slf.AddModule(&slf.dbModule)
 
 	slf.AfterFunc(time.Second*5,slf.Release)
+	slf.AfterFunc(time.Second, slf.TestDB)
 	return nil
 }
 
@@ -133,13 +140,30 @@ func (slf *TestServiceCall) RPC_Test(a *int,b *int) error {
 	return nil
 }
 
+func (slf *TestServiceCall) TestDB() {
+	assetsInfo := &struct {
+		Cash  int64 `json:"cash"`  //美金余额 100
+		Gold  int64 `json:"gold"`  //金币余额
+		Heart int64 `json:"heart"` //心数
+	}{}
+	sql := `call sp_select_userAssets(?)`
+	userID := 100000802
+	err := slf.dbModule.AsyncQuery(func(dataList *sysmodule.DataSetList, err error) {
+		if err != nil {
+			return
+		}
+		err = dataList.UnMarshal(assetsInfo)
+		if err != nil {
+			return
+		}
+	},-1, sql, &userID)
+
+	fmt.Println(err)
+}
+
 func (slf *TestService2) OnInit() error {
 	return nil
 }
-
-
-
-
 
 func main(){
 	node.Init()
