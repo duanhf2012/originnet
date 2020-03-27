@@ -141,7 +141,12 @@ func (agent *RpcAgent) Run() {
 			}
 		}
 
-		rpcHandler.PushRequest(&req)
+		if req.MutiCoroutine == true {
+			go rpcHandler.HandlerRpcRequest(&req)
+		}else{
+			rpcHandler.PushRequest(&req)
+		}
+
 	}
 }
 
@@ -186,7 +191,7 @@ func (slf *Server) myselfRpcHandlerGo(handlerName string,methodName string,reply
 }
 
 
-func (slf *Server) rpcHandlerGo(noReply bool,handlerName string,methodName string,reply interface{}, args ...interface{}) *Call {
+func (slf *Server) rpcHandlerGo(noReply bool,mutiCoroutine bool,handlerName string,methodName string,reply interface{}, args ...interface{}) *Call {
 	pCall := &Call{}
 	pCall.done = make( chan *Call,1)
 	rpcHandler := slf.rpcHandleFinder.FindRpcHandler(handlerName)
@@ -209,13 +214,18 @@ func (slf *Server) rpcHandlerGo(noReply bool,handlerName string,methodName strin
 		}
 	}
 
-	rpcHandler.PushRequest(&req)
+	if mutiCoroutine == true {
+		go rpcHandler.HandlerRpcRequest(&req)
+	}else{
+		rpcHandler.PushRequest(&req)
+	}
+
 	return pCall
 }
 
 
 
-func (slf *Server) rpcHandlerAsyncGo(callerRpcHandler IRpcHandler,noReply bool,handlerName string,methodName string,reply interface{},callback reflect.Value, args ...interface{}) error {
+func (slf *Server) rpcHandlerAsyncGo(callerRpcHandler IRpcHandler,noReply bool,mutiCoroutine bool,handlerName string,methodName string,reply interface{},callback reflect.Value, args ...interface{}) error {
 	pCall := &Call{}
 	//pCall.done = make( chan *Call,1)
 	pCall.rpcHandler = callerRpcHandler
@@ -232,6 +242,7 @@ func (slf *Server) rpcHandlerAsyncGo(callerRpcHandler IRpcHandler,noReply bool,h
 	req.localParam = args
 	req.localReply = reply
 	req.NoReply = noReply
+	req.MutiCoroutine = mutiCoroutine
 
 	if noReply == false {
 		req.requestHandle = func(Returns interface{},Err error){
@@ -241,6 +252,11 @@ func (slf *Server) rpcHandlerAsyncGo(callerRpcHandler IRpcHandler,noReply bool,h
 		}
 	}
 
-	rpcHandler.PushRequest(&req)
+	if mutiCoroutine == true {
+		go rpcHandler.HandlerRpcRequest(&req)
+	}else{
+		rpcHandler.PushRequest(&req)
+	}
+
 	return nil
 }

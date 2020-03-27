@@ -53,7 +53,7 @@ func (slf *Client) Connect(addr string) error {
 	return nil
 }
 
-func (slf *Client) AsycGo(rpcHandler IRpcHandler,serviceMethod string,replyParam interface{},callback reflect.Value, args ...interface{}) error {
+func (slf *Client) AsycGo(rpcHandler IRpcHandler,mutiCoroutine bool,serviceMethod string,replyParam interface{},callback reflect.Value, args ...interface{}) error {
 	call := new(Call)
 	call.Reply = replyParam
 	call.callback = &callback
@@ -61,6 +61,7 @@ func (slf *Client) AsycGo(rpcHandler IRpcHandler,serviceMethod string,replyParam
 
 	request := &RpcRequest{}
 	request.NoReply = false
+	request.MutiCoroutine = mutiCoroutine
 	call.Arg = args
 	slf.pendingLock.Lock()
 	slf.startSeq += 1
@@ -91,12 +92,13 @@ func (slf *Client) AsycGo(rpcHandler IRpcHandler,serviceMethod string,replyParam
 	return call.Err
 }
 
-func (slf *Client) Go(noReply bool,serviceMethod string,reply interface{}, args ...interface{}) *Call {
+func (slf *Client) Go(noReply bool,mutiCoroutine bool,serviceMethod string,reply interface{}, args ...interface{}) *Call {
 	call := new(Call)
 	call.done = make(chan *Call,1)
 	call.Reply = reply
 
 	request := &RpcRequest{}
+	request.MutiCoroutine = mutiCoroutine
 	request.NoReply = noReply
 	call.Arg = args
 	slf.pendingLock.Lock()
@@ -132,15 +134,17 @@ type RequestHandler func(Returns interface{},Err error)
 
 type RpcRequest struct {
 	//packhead
-	Seq uint64// sequence number chosen by client
+	Seq uint64             // sequence number chosen by client
 	ServiceMethod string   // format: "Service.Method"
+	NoReply bool           //是否需要返回
+	MutiCoroutine bool     // 是否多协程模式
 
 	//packbody
 	InParam []byte
 	localReply interface{}
 	localParam []interface{} //本地调用的参数列表
 	requestHandle RequestHandler
-	NoReply bool //是否需要返回
+
 	callback *reflect.Value
 }
 

@@ -221,7 +221,7 @@ func (slf *RpcHandler) CallMethod(ServiceMethod string,reply interface{},param .
 	return err
 }
 
-func (slf *RpcHandler) Go(serviceMethod string,args ...interface{}) error {
+func (slf *RpcHandler) goRpc(serviceMethod string,mutiCoroutine bool,args ...interface{}) error {
 	pClientList,err := slf.funcRpcClient(serviceMethod)
 	if err != nil {
 		log.Error("Call serviceMethod is error:%+v!",err)
@@ -250,16 +250,16 @@ func (slf *RpcHandler) Go(serviceMethod string,args ...interface{}) error {
 			return pLocalRpcServer.myselfRpcHandlerGo(sMethod[0],sMethod[1],nil,args...)
 		}
 		//其他的rpcHandler的处理器
-		pCall := pLocalRpcServer.rpcHandlerGo(true,sMethod[0],sMethod[1],nil,args...)
+		pCall := pLocalRpcServer.rpcHandlerGo(true,mutiCoroutine,sMethod[0],sMethod[1],nil,args...)
 		return pCall.Err
 	}
 
 	//跨node调用
-	pCall := pClient.Go(true,serviceMethod,nil,args...)
+	pCall := pClient.Go(true,mutiCoroutine,serviceMethod,nil,args...)
 	return pCall.Err
 }
 
-func (slf *RpcHandler) Call(serviceMethod string,reply interface{},args ...interface{}) error {
+func (slf *RpcHandler) callRpc(serviceMethod string,reply interface{},mutiCoroutine bool,args ...interface{}) error {
 	pClientList,err := slf.funcRpcClient(serviceMethod)
 	if err != nil {
 		log.Error("Call serviceMethod is error:%+v!",err)
@@ -288,22 +288,18 @@ func (slf *RpcHandler) Call(serviceMethod string,reply interface{},args ...inter
 			return pLocalRpcServer.myselfRpcHandlerGo(sMethod[0],sMethod[1],reply,args...)
 		}
 		//其他的rpcHandler的处理器
-		pCall := pLocalRpcServer.rpcHandlerGo(false,sMethod[0],sMethod[1],reply,args...)
+		pCall := pLocalRpcServer.rpcHandlerGo(false,mutiCoroutine,sMethod[0],sMethod[1],reply,args...)
 		pResult := pCall.Done()
 		return pResult.Err
 	}
 
 	//跨node调用
-	pCall := pClient.Go(false,serviceMethod,reply,args...)
+	pCall := pClient.Go(false,mutiCoroutine,serviceMethod,reply,args...)
 	pResult := pCall.Done()
 	return pResult.Err
 }
 
-
-
-
-
-func (slf *RpcHandler) AsyncCall(serviceMethod string,callback interface{},args ...interface{}) error {
+func (slf *RpcHandler) asyncCallRpc(serviceMethod string,mutiCoroutine bool,callback interface{},args ...interface{}) error {
 	fVal := reflect.ValueOf(callback)
 	if fVal.Kind()!=reflect.Func{
 		return fmt.Errorf("input function is error!")
@@ -345,16 +341,15 @@ func (slf *RpcHandler) AsyncCall(serviceMethod string,callback interface{},args 
 
 		//其他的rpcHandler的处理器
 		if callback!=nil {
-			return  pLocalRpcServer.rpcHandlerAsyncGo(slf,false,sMethod[0],sMethod[1],reply,fVal,args...)
-
+			return  pLocalRpcServer.rpcHandlerAsyncGo(slf,false,mutiCoroutine,sMethod[0],sMethod[1],reply,fVal,args...)
 		}
-		pCall := pLocalRpcServer.rpcHandlerGo(false,sMethod[0],sMethod[1],reply,args...)
+		pCall := pLocalRpcServer.rpcHandlerGo(false,mutiCoroutine,sMethod[0],sMethod[1],reply,args...)
 		pResult := pCall.Done()
 		return pResult.Err
 	}
 
 	//跨node调用
-	return pClient.AsycGo(slf,serviceMethod,reply,fVal,args...)
+	return pClient.AsycGo(slf,mutiCoroutine,serviceMethod,reply,fVal,args...)
 }
 
 func (slf *RpcHandler) GetName() string{
@@ -362,3 +357,30 @@ func (slf *RpcHandler) GetName() string{
 }
 
 
+//func (slf *RpcHandler) asyncCallRpc(serviceMethod string,mutiCoroutine bool,callback interface{},args ...interface{}) error {
+//func (slf *RpcHandler) callRpc(serviceMethod string,reply interface{},mutiCoroutine bool,args ...interface{}) error {
+//func (slf *RpcHandler) goRpc(serviceMethod string,mutiCoroutine bool,args ...interface{}) error {
+
+func (slf *RpcHandler) AsyncCall(serviceMethod string,callback interface{},args ...interface{}) error {
+	return slf.asyncCallRpc(serviceMethod,false,callback,args...)
+}
+
+func (slf *RpcHandler) GRAsyncCall(serviceMethod string,callback interface{},args ...interface{}) error {
+	return slf.asyncCallRpc(serviceMethod,true,callback,args...)
+}
+
+func (slf *RpcHandler) Call(serviceMethod string,reply interface{},args ...interface{}) error {
+	return slf.callRpc(serviceMethod,reply,false,args...)
+}
+
+func (slf *RpcHandler) GRCall(serviceMethod string,reply interface{},args ...interface{}) error {
+	return slf.callRpc(serviceMethod,reply,true,args...)
+}
+
+func (slf *RpcHandler) Go(serviceMethod string,args ...interface{}) error {
+	return slf.goRpc(serviceMethod,false,args...)
+}
+
+func (slf *RpcHandler) GRGo(serviceMethod string,args ...interface{}) error {
+	return slf.goRpc(serviceMethod,true,args...)
+}

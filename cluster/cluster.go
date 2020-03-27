@@ -103,6 +103,7 @@ func (slf *Cluster) GetRpcClient(nodeid int) *rpc.Client {
 
 
 //servicename.method
+/*
 func Call(irecv rpc.IRpcHandler,serviceMethod string,reply interface{},args ...interface{}) error {
 	pClientList,err := GetRpcClient(serviceMethod)
 	if err != nil {
@@ -118,7 +119,7 @@ func Call(irecv rpc.IRpcHandler,serviceMethod string,reply interface{},args ...i
 	pResult := pCall.Done()
 	return pResult.Err
 }
-
+*/
 
 func GetRpcClient(serviceMethod string) ([]*rpc.Client,error) {
 	serviceAndMethod := strings.Split(serviceMethod,".")
