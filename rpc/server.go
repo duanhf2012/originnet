@@ -16,7 +16,7 @@ var LittleEndian bool
 type Call struct {
 	Seq uint64
 	//ServiceMethod string
-	Arg []interface{}
+	Arg interface{}
 	Reply interface{}
 	Respone *RpcResponse
 	Err error
@@ -179,7 +179,7 @@ func (slf *Server) NewAgent(conn *network.TCPConn) network.Agent {
 	return agent
 }
 
-func (slf *Server) myselfRpcHandlerGo(handlerName string,methodName string,reply interface{}, args ...interface{}) error {
+func (slf *Server) myselfRpcHandlerGo(handlerName string,methodName string, args interface{},reply interface{}) error {
 	rpcHandler := slf.rpcHandleFinder.FindRpcHandler(handlerName)
 	if rpcHandler== nil {
 		err := fmt.Errorf("service method %s.%s not config!", handlerName,methodName)
@@ -187,11 +187,11 @@ func (slf *Server) myselfRpcHandlerGo(handlerName string,methodName string,reply
 		return err
 	}
 
-	return rpcHandler.CallMethod(fmt.Sprintf("%s.%s",handlerName,methodName),reply,args...)
+	return rpcHandler.CallMethod(fmt.Sprintf("%s.%s",handlerName,methodName),args,reply)
 }
 
 
-func (slf *Server) rpcHandlerGo(noReply bool,mutiCoroutine bool,handlerName string,methodName string,reply interface{}, args ...interface{}) *Call {
+func (slf *Server) rpcHandlerGo(noReply bool,mutiCoroutine bool,handlerName string,methodName string, args interface{},reply interface{}) *Call {
 	pCall := &Call{}
 	pCall.done = make( chan *Call,1)
 	rpcHandler := slf.rpcHandleFinder.FindRpcHandler(handlerName)
@@ -223,9 +223,7 @@ func (slf *Server) rpcHandlerGo(noReply bool,mutiCoroutine bool,handlerName stri
 	return pCall
 }
 
-
-
-func (slf *Server) rpcHandlerAsyncGo(callerRpcHandler IRpcHandler,noReply bool,mutiCoroutine bool,handlerName string,methodName string,reply interface{},callback reflect.Value, args ...interface{}) error {
+func (slf *Server) rpcHandlerAsyncGo(callerRpcHandler IRpcHandler,noReply bool,mutiCoroutine bool,handlerName string,methodName string,args interface{},reply interface{},callback reflect.Value) error {
 	pCall := &Call{}
 	//pCall.done = make( chan *Call,1)
 	pCall.rpcHandler = callerRpcHandler

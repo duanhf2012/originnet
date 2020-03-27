@@ -53,7 +53,7 @@ func (slf *Client) Connect(addr string) error {
 	return nil
 }
 
-func (slf *Client) AsycGo(rpcHandler IRpcHandler,mutiCoroutine bool,serviceMethod string,replyParam interface{},callback reflect.Value, args ...interface{}) error {
+func (slf *Client) AsycGo(rpcHandler IRpcHandler,mutiCoroutine bool,serviceMethod string,callback reflect.Value, args interface{},replyParam interface{}) error {
 	call := new(Call)
 	call.Reply = replyParam
 	call.callback = &callback
@@ -92,7 +92,7 @@ func (slf *Client) AsycGo(rpcHandler IRpcHandler,mutiCoroutine bool,serviceMetho
 	return call.Err
 }
 
-func (slf *Client) Go(noReply bool,mutiCoroutine bool,serviceMethod string,reply interface{}, args ...interface{}) *Call {
+func (slf *Client) Go(noReply bool,mutiCoroutine bool,serviceMethod string, args interface{},reply interface{}) *Call {
 	call := new(Call)
 	call.done = make(chan *Call,1)
 	call.Reply = reply
@@ -142,7 +142,7 @@ type RpcRequest struct {
 	//packbody
 	InParam []byte
 	localReply interface{}
-	localParam []interface{} //本地调用的参数列表
+	localParam interface{} //本地调用的参数列表
 	requestHandle RequestHandler
 
 	callback *reflect.Value

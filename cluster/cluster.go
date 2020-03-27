@@ -101,26 +101,6 @@ func (slf *Cluster) GetRpcClient(nodeid int) *rpc.Client {
 	return c.client
 }
 
-
-//servicename.method
-/*
-func Call(irecv rpc.IRpcHandler,serviceMethod string,reply interface{},args ...interface{}) error {
-	pClientList,err := GetRpcClient(serviceMethod)
-	if err != nil {
-		log.Error("Call serviceMethod is error:%+v!",err)
-		return err
-	}
-	if len(pClientList) >1 {
-		log.Error("Cannot call more then 1 node!")
-		return err
-	}
-	//2.rpcclient调用
-	pCall := pClientList[0].Go(false,serviceMethod,reply,args)
-	pResult := pCall.Done()
-	return pResult.Err
-}
-*/
-
 func GetRpcClient(serviceMethod string) ([]*rpc.Client,error) {
 	serviceAndMethod := strings.Split(serviceMethod,".")
 	if len(serviceAndMethod)!=2 {

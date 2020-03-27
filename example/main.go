@@ -114,9 +114,9 @@ func  (slf *TestServiceCall) Run(){
 	bT := time.Now()            // 开始时间
 
 	//err := slf.Call("TestServiceCall.RPC_Test",&ret,&input)
-	err := slf.AsyncCall("TestService1.RPC_Test", func(reply *int, err error) {
+	err := slf.AsyncCall("TestService1.RPC_Test",&input, func(reply *int, err error) {
 		fmt.Print(*reply,"\n",err)
-	},&input)
+	})
 
 
 	eT := time.Since(bT)      // 从开始到当前所消耗的时间
