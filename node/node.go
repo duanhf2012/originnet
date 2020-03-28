@@ -71,7 +71,8 @@ func Init(){
 
 	//3.初始化预安装的服务
 	for _,s := range preSetupService {
-		s.Init(s,cluster.GetRpcClient,cluster.GetRpcServer)
+		pServiceCfg := cluster.GetCluster().GetServiceCfg(s.GetName())
+		s.Init(s,cluster.GetRpcClient,cluster.GetRpcServer,pServiceCfg)
 		//是否配置的service
 		if cluster.GetCluster().IsConfigService(s.GetName()) == false {
 			continue
@@ -88,6 +89,7 @@ func Start() {
 		select {
 		case <-sigs:
 			fmt.Printf("Recv stop sig")
+			break
 		default:
 			time.Sleep(time.Second)
 		}

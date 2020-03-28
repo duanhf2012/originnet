@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/duanhf2012/originnet/example/GateService"
 	"github.com/duanhf2012/originnet/node"
 	"github.com/duanhf2012/originnet/service"
 	"github.com/duanhf2012/originnet/sysmodule"
+	"github.com/duanhf2012/originnet/sysservice"
 	"time"
 )
 
@@ -108,25 +110,46 @@ func  (slf *TestServiceCall) Release(){
 	slf.ReleaseModule(moduleid2)
 }
 
+
+type Param struct {
+	Index int
+	A int
+	B string
+	Pa []string
+}
+
+
 func  (slf *TestServiceCall) Run(){
 	//var ret int
-	var input int = 100000
+	var input int = 10000
 	bT := time.Now()            // 开始时间
 
 	//err := slf.Call("TestServiceCall.RPC_Test",&ret,&input)
-	err := slf.AsyncCall("TestService1.RPC_Test",&input, func(reply *int, err error) {
-		fmt.Print(*reply,"\n",err)
-	})
+	var param Param
+	param.A = 2342342341
+	param.B = "xxxxxxxxxxxxxxxxxxxxxxx"
+	param.Pa = []string{"ccccc","asfsdfsdaf","bbadfsdf","ewrwefasdf","safsadfka;fksd"}
+
+	for i:=input;i>=0;i--{
+		param.Index = i
+		slf.AsyncCall("TestService1.RPC_Test",&param, func(reply *Param, err error) {
+			if reply.Index == 0 || err != nil{
+				eT := time.Since(bT)      // 从开始到当前所消耗的时间
+				fmt.Print(err,eT.Milliseconds())
+				fmt.Print("..................",eT,"\n")
+			}
+			//fmt.Print(*reply,"\n",err)
+		})
+
+	}
+
+	fmt.Print("finsh....")
 
 
-	eT := time.Since(bT)      // 从开始到当前所消耗的时间
-	fmt.Print(err,eT.Nanoseconds())
 }
 
-func (slf *TestService1) RPC_Test(a *int,b *int) error {
-	fmt.Printf("TestService1\n")
-	*a = *b*2
-	//slf.AfterFunc(time.Second,slf.Test)
+func (slf *TestService1) RPC_Test(a *Param,b *Param) error {
+	*a = *b
 	return nil
 }
 
@@ -167,6 +190,12 @@ func (slf *TestService2) OnInit() error {
 
 func main(){
 	node.Init()
+	tcpService := &sysservice.TcpService{}
+	gateService := &GateService.GateService{}
+
+	tcpService.SetEventReciver(gateService)
+	node.Setup(tcpService,gateService)
+
 	node.Start()
 }
 

@@ -21,8 +21,21 @@ func (slf *Cluster) ReadClusterConfig(filepath string) (*SubNet,error) {
 	return c,nil
 }
 
-func (slf *Cluster) ReadServiceConfig(filepath string) error {
-	return nil
+
+func (slf *Cluster) ReadServiceConfig(filepath string)  (map[string]interface{},error) {
+	c := map[string]interface{}{}
+
+	d, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(d, &c)
+	if err != nil {
+		return nil, err
+	}
+
+	return c,nil
+
 }
 
 func (slf *Cluster) ReadAllSubNetConfig() error {
@@ -42,8 +55,30 @@ func (slf *Cluster) ReadAllSubNetConfig() error {
 		}
 	}
 
+
 	return nil
 }
+
+func (slf *Cluster) ReadLocalSubNetServiceConfig(subnet string) error {
+	clusterCfgPath :=strings.TrimRight(configdir,"/")  +"/cluster"
+	fileInfoList,err := ioutil.ReadDir(clusterCfgPath)
+	if err != nil {
+		return err
+	}
+	slf.mapSubNetInfo =map[string] SubNet{}
+	for _,f := range fileInfoList{
+		if f.IsDir() == true && f.Name()==subnet{ //同一子网
+			localNodeServiceCfg,err:=slf.ReadServiceConfig(strings.TrimRight(strings.TrimRight(clusterCfgPath,"/"),"\\")+"/"+f.Name()+"/"+"service.json")
+			if err != nil {
+				return err
+			}
+			slf.localNodeServiceCfg =localNodeServiceCfg
+		}
+	}
+
+	return nil
+}
+
 
 
 func (slf *Cluster) InitCfg(currentNodeId int) error{
@@ -123,6 +158,9 @@ func (slf *Cluster) InitCfg(currentNodeId int) error{
 	slf.localNodeMapService = localNodeMapService
 	slf.localsubnet = subnet
 	slf.localNodeInfo =localNodeInfo
+
+	//读取服务
+
 	return err
 }
 
@@ -142,4 +180,13 @@ func (slf *Cluster) GetNodeIdByService(servicename string) []int{
 	}
 
 	return nodelist
+}
+
+func (slf *Cluster) GetServiceCfg(servicename string) interface{}{
+	v,ok := slf.localNodeServiceCfg[servicename]
+	if ok == false{
+		return nil
+	}
+
+	return v
 }

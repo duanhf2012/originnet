@@ -26,6 +26,8 @@ type NodeRpcInfo struct {
 	client *rpc.Client
 }
 
+
+
 var cluster Cluster
 
 type Cluster struct {
@@ -37,6 +39,8 @@ type Cluster struct {
 	localSubNetMapService map[string][]NodeInfo   //本子网内所有ServiceName对应的结点列表
 	localNodeMapService map[string]interface{}    //本Node支持的服务
 	localNodeInfo NodeInfo
+
+	localNodeServiceCfg map[string]interface{} //map[servicename]数据
 
 	mapRpc map[int] NodeRpcInfo//nodeid
 

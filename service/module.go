@@ -2,11 +2,14 @@ package service
 
 import (
 	"fmt"
+	"github.com/duanhf2012/originnet/event"
 	"github.com/duanhf2012/originnet/util/timer"
 	"time"
 )
 
 const InitModuleId = 1e18
+
+
 type IModule interface {
 	SetModuleId(moduleId int64) bool
 	GetModuleId() int64
@@ -18,10 +21,12 @@ type IModule interface {
 	GetParent()IModule
 	OnInit() error
 	OnRelease()
-
 	getBaseModule() IModule
 	GetService() IService
+	GetEventChan() chan *event.Event
 }
+
+
 
 //1.管理各模块树层关系
 //2.提供定时器常用工具
@@ -39,7 +44,12 @@ type Module struct {
 	ancestor IModule      //始祖
 	seedModuleId int64    //模块id种子
 	descendants map[int64]IModule//始祖的后裔们
+
+	//事件管道
+	event.EventProcessor
+	//eventChan chan *SEvent
 }
+
 
 func (slf *Module) SetModuleId(moduleId int64) bool{
 	if moduleId > 0 {
@@ -179,3 +189,4 @@ func (slf *Module) OnRelease(){
 func (slf *Module) GetService() IService {
 	return slf.GetAncestor().(IService)
 }
+
