@@ -142,15 +142,17 @@ func (slf *TestServiceCall) TestDB() {
 	}{}
 	sql := `call sp_select_userAssets(?)`
 	userID := 100000802
-	dbResult := slf.dbModule.SyncQuery(-1, sql, &userID)
-	dbData, err := dbResult.Get(5000)
-	if err != nil {
-		return
-	}
-	err = dbData.UnMarshal(assetsInfo)
-	if err != nil {
-		return
-	}
+	err := slf.dbModule.AsyncQuery(func(dataList *sysmodule.DataSetList, err error) {
+		if err != nil {
+			return
+		}
+		err = dataList.UnMarshal(assetsInfo)
+		if err != nil {
+			return
+		}
+	},-1, sql, &userID)
+
+	fmt.Println(err)
 }
 
 func (slf *TestService2) OnInit() error {

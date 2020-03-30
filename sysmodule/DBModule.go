@@ -89,14 +89,42 @@ type SyncDBResult struct {
 	sres chan DBResult
 }
 
+type SyncDBResultExCallBack func(dataList *DataSetList, err error)
+
 type SyncQueryDBResultEx struct {
 	sres chan *DataSetList
 	err  chan error
 }
 
+func (slf *SyncQueryDBResultEx) Get(timeoutMs int) (*DataSetList, error) {
+	timerC := time.NewTicker(time.Millisecond * time.Duration(timeoutMs)).C
+	select {
+	case <-timerC:
+		break
+	case err := <-slf.err:
+		dataset := <-slf.sres
+		return dataset, err
+	}
+
+	return nil, fmt.Errorf("Getting the return result timeout [%d]ms", timeoutMs)
+}
+
 type SyncExecuteDBResult struct {
 	sres chan *DBResultEx
 	err  chan error
+}
+
+func (slf *SyncExecuteDBResult) Get(timeoutMs int) (*DBResultEx, error) {
+	timerC := time.NewTicker(time.Millisecond * time.Duration(timeoutMs)).C
+	select {
+	case <-timerC:
+		break
+	case err := <-slf.err:
+		dataset := <-slf.sres
+		return dataset, err
+	}
+
+	return nil, fmt.Errorf("Getting the return result timeout [%d]ms", timeoutMs)
 }
 
 func (slf *DBModule) RunPing() {
@@ -376,32 +404,6 @@ func (slf *SyncDBResult) Get(timeoutMs int) DBResult {
 	}
 }
 
-func (slf *SyncQueryDBResultEx) Get(timeoutMs int) (*DataSetList, error) {
-	timerC := time.NewTicker(time.Millisecond * time.Duration(timeoutMs)).C
-	select {
-	case <-timerC:
-		break
-	case err := <-slf.err:
-		dataset := <-slf.sres
-		return dataset, err
-	}
-
-	return nil, fmt.Errorf("Getting the return result timeout [%d]ms", timeoutMs)
-}
-
-func (slf *SyncExecuteDBResult) Get(timeoutMs int) (*DBResultEx, error) {
-	timerC := time.NewTicker(time.Millisecond * time.Duration(timeoutMs)).C
-	select {
-	case <-timerC:
-		break
-	case err := <-slf.err:
-		dataset := <-slf.sres
-		return dataset, err
-	}
-
-	return nil, fmt.Errorf("Getting the return result timeout [%d]ms", timeoutMs)
-}
-
 func (slf *DBModule) CheckArgs(args ...interface{}) error {
 	for _, val := range args {
 		if reflect.TypeOf(val).Kind() == reflect.String {
@@ -575,6 +577,25 @@ func (slf *DBModule) SyncQuery(queryHas int, query string, args ...interface{}) 
 	return ret
 }
 
+func (slf *DBModule) AsyncQuery(call SyncDBResultExCallBack, queryHas int, query string, args ...interface{}) error {
+	chanIndex := queryHas % len(slf.executeList)
+	if chanIndex < 0 {
+		chanIndex = rand.Intn(len(slf.executeList))
+	}
+	
+	if len(slf.executeList[chanIndex].syncExecuteFun) >= MAX_EXECUTE_FUN {
+		return fmt.Errorf("chan is full,sql:%s", query)
+	}
+
+	slf.executeList[chanIndex].syncExecuteFun <- func() {
+		rsp, err := slf.QueryEx(query, args...)
+		call(rsp, err)
+		return
+	}
+
+	return nil
+}
+
 // Exec ...
 func (slf *DBModule) Exec(query string, args ...interface{}) (*DBResultEx, error) {
 	ret := &DBResultEx{}
@@ -635,6 +656,29 @@ func (slf *DBModule) SyncExec(queryHas int, query string, args ...interface{}) *
 	}
 
 	return ret
+}
+
+func (slf *DBModule) AsyncExec(call SyncDBResultExCallBack, queryHas int, query string, args ...interface{}) error {
+	chanIndex := queryHas % len(slf.executeList)
+	if chanIndex < 0 {
+		chanIndex = rand.Intn(len(slf.executeList))
+	}
+
+	if len(slf.executeList[chanIndex].syncExecuteFun) >= MAX_EXECUTE_FUN {
+		return fmt.Errorf("chan is full,sql:%s", query)
+	}
+
+	slf.executeList[chanIndex].syncExecuteFun <- func() {
+		rsp, err := slf.Exec(query, args...)
+
+		data := DataSetList{tag:"json", blur:true, dataSetList:[]DBResultEx{}}
+		data.dataSetList = append(data.dataSetList, *rsp)
+		call(&data, err)
+
+		return
+	}
+
+	return nil
 }
 
 func (slf *DBModule) RunExecuteDBCoroutine(has int) {
