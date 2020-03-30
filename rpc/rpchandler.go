@@ -125,6 +125,125 @@ func (slf *RpcHandler) GetRpcRequestChan() (chan *RpcRequest) {
 	return slf.callRequest
 }
 
+
+
+func (slf *RpcHandler) HandlerRpcRequest(request *RpcRequest) {
+	v,ok := slf.mapfunctons[request.ServiceMethod]
+	if ok == false {
+		err := fmt.Errorf("RpcHandler %s cannot find %s",slf.rpcHandler.GetName(),request.ServiceMethod)
+		log.Error("%s",err.Error())
+		if request.requestHandle!=nil {
+			request.requestHandle(nil,err)
+		}
+
+		return
+	}
+
+	var paramList []reflect.Value
+	var err error
+	if len(request.localParam)==0{
+		err = processor.Unmarshal(request.InParam,&v.iparam)
+		if err!=nil {
+			rerr := fmt.Errorf("Call Rpc %s Param error %+v",request.ServiceMethod,err)
+			log.Error("%s",rerr.Error())
+			if request.requestHandle!=nil {
+				request.requestHandle(nil, rerr)
+			}
+		}
+	}else {
+		v.iparam = request.localParam
+	}
+
+
+	paramList = append(paramList,reflect.ValueOf(slf.GetRpcHandler())) //接受者
+	if request.localReply!=nil {
+		paramList = append(paramList,reflect.ValueOf(request.localReply))
+	}else{
+		paramList = append(paramList,v.oParam) //输出参数
+	}
+
+	//其他输入参数
+	for _,iv := range v.iparam {
+		paramList = append(paramList,reflect.ValueOf(iv))
+	}
+
+	returnValues := v.method.Func.Call(paramList)
+	errInter := returnValues[0].Interface()
+	if errInter != nil {
+		err = errInter.(error)
+	}
+
+	if request.requestHandle!=nil {
+		request.requestHandle(v.oParam.Interface(), err)
+	}
+}
+
+func (slf *RpcHandler) CallMethod(ServiceMethod string,reply interface{},param ...interface{}) error{
+	var err error
+	v,ok := slf.mapfunctons[ServiceMethod]
+	if ok == false {
+		err = fmt.Errorf("RpcHandler %s cannot find %s",slf.rpcHandler.GetName(),ServiceMethod)
+		log.Error("%s",err.Error())
+
+		return err
+	}
+
+	var paramList []reflect.Value
+	paramList = append(paramList,reflect.ValueOf(slf.GetRpcHandler())) //接受者
+	paramList = append(paramList,reflect.ValueOf(reply)) //输出参数
+
+	//其他输入参数
+	for _,iv := range param {
+		paramList = append(paramList,reflect.ValueOf(iv))
+	}
+
+	returnValues := v.method.Func.Call(paramList)
+	errInter := returnValues[0].Interface()
+	if errInter != nil {
+		err = errInter.(error)
+	}
+
+	return err
+}
+
+func (slf *RpcHandler) Go(serviceMethod string,args ...interface{}) error {
+	pClientList,err := slf.funcRpcClient(serviceMethod)
+	if err != nil {
+		log.Error("Call serviceMethod is error:%+v!",err)
+		return err
+	}
+	if len(pClientList) > 1 {
+		log.Error("Cannot call more then 1 node!")
+		return fmt.Errorf("Cannot call more then 1 node!")
+	}
+
+	//2.rpcclient调用
+	//如果调用本结点服务
+	pClient := pClientList[0]
+	if pClient.blocalhost == true {
+		pLocalRpcServer:=slf.funcRpcServer()
+		//判断是否是同一服务
+		sMethod := strings.Split(serviceMethod,".")
+		if len(sMethod)!=2 {
+			err := fmt.Errorf("Call serviceMethod %s is error!",serviceMethod)
+			log.Error("%+v",err)
+			return err
+		}
+		//调用自己rpcHandler处理器
+		if sMethod[0] == slf.rpcHandler.GetName() { //自己服务调用
+			//
+			return pLocalRpcServer.myselfRpcHandlerGo(sMethod[0],sMethod[1],nil,args...)
+		}
+		//其他的rpcHandler的处理器
+		pCall := pLocalRpcServer.rpcHandlerGo(true,sMethod[0],sMethod[1],nil,args...)
+		return pCall.Err
+	}
+
+	//跨node调用
+	pCall := pClient.Go(true,serviceMethod,nil,args...)
+	return pCall.Err
+}
+
 func (slf *RpcHandler) Call(serviceMethod string,reply interface{},args ...interface{}) error {
 	pClientList,err := slf.funcRpcClient(serviceMethod)
 	if err != nil {
@@ -154,89 +273,57 @@ func (slf *RpcHandler) Call(serviceMethod string,reply interface{},args ...inter
 			return pLocalRpcServer.myselfRpcHandlerGo(sMethod[0],sMethod[1],reply,args...)
 		}
 		//其他的rpcHandler的处理器
-		pCall := pLocalRpcServer.rpcHandlerGo(sMethod[0],sMethod[1],reply,args...)
+		pCall := pLocalRpcServer.rpcHandlerGo(false,sMethod[0],sMethod[1],reply,args...)
 		pResult := pCall.Done()
 		return pResult.Err
 	}
 
 	//跨node调用
-	pCall := pClient.Go(serviceMethod,reply,args...)
+	pCall := pClient.Go(false,serviceMethod,reply,args...)
 	pResult := pCall.Done()
 	return pResult.Err
 }
 
-
-func (slf *RpcHandler) HandlerRpcRequest(request *RpcRequest) {
-	v,ok := slf.mapfunctons[request.ServiceMethod]
-	if ok == false {
-		err := fmt.Errorf("RpcHandler %s cannot find %s",slf.rpcHandler.GetName(),request.ServiceMethod)
-		log.Error("%s",err.Error())
-		request.requestHandle(nil,err)
-		return
-	}
-
-	var paramList []reflect.Value
-	var err error
-	if len(request.localParam)==0{
-		err = processor.Unmarshal(request.InParam,&v.iparam)
-		if err!=nil {
-			rerr := fmt.Errorf("Call Rpc %s Param error %+v",request.ServiceMethod,err)
-			log.Error("%s",rerr.Error())
-			request.requestHandle(nil,rerr)
-		}
-	}else {
-		v.iparam = request.localParam
-	}
-
-
-	paramList = append(paramList,reflect.ValueOf(slf.GetRpcHandler())) //接受者
-	if request.localReply!=nil {
-		paramList = append(paramList,reflect.ValueOf(request.localReply))
-	}else{
-		paramList = append(paramList,v.oParam) //输出参数
-	}
-
-
-	//其他输入参数
-	for _,iv := range v.iparam {
-		paramList = append(paramList,reflect.ValueOf(iv))
-	}
-
-
-	returnValues := v.method.Func.Call(paramList)
-	errInter := returnValues[0].Interface()
-	if errInter != nil {
-		err = errInter.(error)
-	}
-
-	request.requestHandle(v.oParam.Interface(),err)
-}
-
-func (slf *RpcHandler) CallMethod(ServiceMethod string,reply interface{},param ...interface{}) error{
-	var err error
-	v,ok := slf.mapfunctons[ServiceMethod]
-	if ok == false {
-		err = fmt.Errorf("RpcHandler %s cannot find %s",slf.rpcHandler.GetName(),ServiceMethod)
-		log.Error("%s",err.Error())
-
+//
+/*
+func (slf *RpcHandler) AsycCall(serviceMethod string,callback func(reply interface{}),args ...interface{}) error {
+	pClientList,err := slf.funcRpcClient(serviceMethod)
+	if err != nil {
+		log.Error("Call serviceMethod is error:%+v!",err)
 		return err
 	}
-
-	var paramList []reflect.Value
-	paramList = append(paramList,reflect.ValueOf(slf.GetRpcHandler())) //接受者
-	paramList = append(paramList,reflect.ValueOf(reply)) //输出参数
-
-	//其他输入参数
-	for _,iv := range param {
-		paramList = append(paramList,reflect.ValueOf(iv))
+	if len(pClientList) > 1 {
+		log.Error("Cannot call more then 1 node!")
+		return fmt.Errorf("Cannot call more then 1 node!")
 	}
 
-
-	returnValues := v.method.Func.Call(paramList)
-	errInter := returnValues[0].Interface()
-	if errInter != nil {
-		err = errInter.(error)
+	//2.rpcclient调用
+	//如果调用本结点服务
+	pClient := pClientList[0]
+	if pClient.blocalhost == true {
+		pLocalRpcServer:=slf.funcRpcServer()
+		//判断是否是同一服务
+		sMethod := strings.Split(serviceMethod,".")
+		if len(sMethod)!=2 {
+			err := fmt.Errorf("Call serviceMethod %s is error!",serviceMethod)
+			log.Error("%+v",err)
+			return err
+		}
+		//调用自己rpcHandler处理器
+		if sMethod[0] == slf.rpcHandler.GetName() { //自己服务调用
+			//
+			return pLocalRpcServer.myselfRpcHandlerGo(sMethod[0],sMethod[1],reply,args...)
+		}
+		//其他的rpcHandler的处理器
+		pCall := pLocalRpcServer.rpcHandlerGo(false,sMethod[0],sMethod[1],reply,args...)
+		pResult := pCall.Done()
+		return pResult.Err
 	}
 
-	return err
+	//跨node调用
+	pCall := pClient.Go(false,serviceMethod,reply,args...)
+	pResult := pCall.Done()
+	return pResult.Err
 }
+
+ */

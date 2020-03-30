@@ -20,6 +20,7 @@ type IModule interface {
 	OnRelease()
 
 	getBaseModule() IModule
+	GetService() IService
 }
 
 //1.管理各模块树层关系
@@ -71,7 +72,6 @@ func (slf *Module) AddModule(module IModule) (int64,error){
 		return 0,fmt.Errorf("Exists module id %d",module.GetModuleId())
 	}
 
-
 	pAddModule.self = module
 	pAddModule.parent = slf.self
 	pAddModule.dispatcher = slf.GetAncestor().getBaseModule().(*Module).dispatcher
@@ -104,21 +104,6 @@ func (slf *Module) ReleaseModule(moduleId int64){
 	for pCron,_ := range pModule.mapActiveCron {
 		pCron.Stop()
 	}
-
-	/*
-	moduleId int64
-		parent IModule        //父亲
-		child map[int64]IModule //孩子们
-		mapActiveTimer map[*timer.Timer]interface{}
-		mapActiveCron map[*timer.Cron]interface{}
-
-		dispatcher         *timer.Dispatcher //timer
-
-		//根结点
-		ancestor IModule      //始祖
-		seedModuleId int64    //模块id种子
-		descendants map[int64]IModule//始祖的后裔们
-	*/
 
 	delete(slf.child,moduleId)
 	delete (slf.ancestor.getBaseModule().(*Module).descendants,moduleId)
@@ -189,4 +174,8 @@ func (slf *Module) CronFunc(cronExpr *timer.CronExpr, cb func()) *timer.Cron {
 }
 
 func (slf *Module) OnRelease(){
+}
+
+func (slf *Module) GetService() IService {
+	return slf.GetAncestor().(IService)
 }

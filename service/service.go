@@ -40,7 +40,7 @@ func (slf *Service) Init(iservice IService,getClientFun rpc.FuncRpcClient,getSer
 	slf.InitRpcHandler(iservice.(rpc.IRpcHandler),getClientFun,getServerFun)
 
 	//初始化祖先
-	slf.ancestor = slf
+	slf.ancestor = iservice.(IModule)
 	slf.seedModuleId =InitModuleId
 	slf.descendants = map[int64]IModule{}
 

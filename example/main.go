@@ -64,7 +64,8 @@ func (slf *Module3) OnInit() error {
 
 func (slf *Module4) OnInit() error {
 	fmt.Printf("I'm Module4:%d\n",slf.GetModuleId())
-
+	pService := slf.GetService().(*TestServiceCall)
+	pService.RPC_Test(nil,nil)
 	slf.AfterFunc(time.Second*10,slf.TimerTest)
 	return nil
 }
